@@ -1,0 +1,38 @@
+{
+  "iisSettings": {
+    "windowsAuthentication": false,
+    "anonymousAuthentication": true,
+    "iis": {
+      "applicationUrl": "http://localhost/futurenhs-wopi-doc-server",
+      "sslPort": 0
+    },
+    "iisExpress": {
+      "applicationUrl": "https://localhost:44355/",
+      "sslPort": 0
+    }
+  },
+  "profiles": {
+    "IIS Express": {
+      "commandName": "IISExpress",
+      "launchBrowser": true,
+      "launchUrl": "/collabora",
+      "environmentVariables": {
+        "ASPNETCORE_ENVIRONMENT": "Development",
+        "USE_AZURE_APP_CONFIGURATION": "true"
+      }
+    },
+    "FutureNHS.WOPIHost": {
+      "commandName": "Project",
+      "launchBrowser": true,
+      "launchUrl": "collabora?file_id=Excel-Spreadsheet.xlsx",
+      "environmentVariables": {
+        "ASPNETCORE_ENVIRONMENT": "Development",
+        "USE_AZURE_APP_CONFIGURATION": "true"
+      },
+      "applicationUrl": "http://127.0.0.1:44355"
+    },
+    "IIS": {
+      "commandName": "IIS"
+    }
+  }
+}
