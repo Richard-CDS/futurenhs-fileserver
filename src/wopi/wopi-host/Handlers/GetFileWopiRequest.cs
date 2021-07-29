@@ -4,6 +4,7 @@ using System;
 using System.Threading;
 using System.Threading.Tasks;
 using System.IO;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace FutureNHS.WOPIHost.Handlers
 {
@@ -12,26 +13,24 @@ namespace FutureNHS.WOPIHost.Handlers
     {
         private readonly string _fileId;
 
-        private GetFileWopiRequest(string fileId, string accessToken, CancellationToken cancellationToken) 
-            : base(accessToken, isWriteAccessRequired: false, cancellationToken) 
+        private GetFileWopiRequest(string fileId, string accessToken) 
+            : base(accessToken, isWriteAccessRequired: false) 
         {
             if (string.IsNullOrWhiteSpace(fileId)) throw new ArgumentNullException(nameof(fileId));
  
             _fileId = fileId;           
         }
 
-        internal static GetFileWopiRequest With(string fileId, string accessToken, CancellationToken cancellationToken) => new GetFileWopiRequest(fileId, accessToken, cancellationToken);
+        internal static GetFileWopiRequest With(string fileId, string accessToken) => new GetFileWopiRequest(fileId, accessToken);
 
-        protected override async Task HandleAsyncImpl(HttpContext context)
+        protected override async Task HandleAsyncImpl(HttpContext context, CancellationToken cancellationToken)
         {
             // GET /wopi/files/(file_id)/content 
 
             // TODO - This is where we would go and get the file out of storage and write it to the response stream
             //        taking care of locking etc along the way if the user wants to edit it
 
-            if (!(context.RequestServices.GetService(typeof(IWebHostEnvironment)) is IWebHostEnvironment hostingEnv)) return;
-
-            if (hostingEnv is null) return;
+            var hostingEnv = context.RequestServices.GetRequiredService<IWebHostEnvironment>();
 
             var filePath = Path.Combine(hostingEnv.ContentRootPath, "Files", _fileId);
 
@@ -41,7 +40,7 @@ namespace FutureNHS.WOPIHost.Handlers
 
             await context.Response.StartAsync();
 
-            await context.Response.SendFileAsync(filePath, _cancellationToken);
+            await context.Response.SendFileAsync(filePath, cancellationToken);
         }
     }
 }

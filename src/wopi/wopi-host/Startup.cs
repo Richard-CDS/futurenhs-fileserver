@@ -10,6 +10,7 @@ using Microsoft.FeatureManagement.FeatureFilters;
 using System;
 using System.IO;
 using System.Linq;
+using System.Net.Http;
 using System.Text;
 using System.Threading.Tasks;
 
@@ -47,7 +48,13 @@ namespace FutureNHS.WOPIHost
             services.AddFeatureManagement().
                      AddFeatureFilter<TimeWindowFilter>().      // enable a feature between a start and end date ....... https://docs.microsoft.com/dotnet/api/microsoft.featuremanagement.featurefilters.timewindowfilter?view=azure-dotnet-preview
                      AddFeatureFilter<PercentageFilter>();      // for randomly sampling a percentage of the audience .. https://docs.microsoft.com/dotnet/api/microsoft.featuremanagement.featurefilters.percentagefilter?view=azure-dotnet-preview
-                     //AddFeatureFilter<TargetingFilter>();       // for targeting certain audiences ..................... https://docs.microsoft.com/dotnet/api/microsoft.featuremanagement.featurefilters.targetingfilter?view=azure-dotnet-preview
+                   //AddFeatureFilter<TargetingFilter>();       // for targeting certain audiences ..................... https://docs.microsoft.com/dotnet/api/microsoft.featuremanagement.featurefilters.targetingfilter?view=azure-dotnet-preview
+
+            services.AddTransient<WopiRequestFactory>();
+            services.AddTransient<IWopiRequestFactory>(sp => sp.GetRequiredService<WopiRequestFactory>());
+
+            services.AddTransient<WopiDiscoveryDocumentFactory>();
+            services.AddTransient<IWopiDiscoveryDocumentFactory>(sp => sp.GetRequiredService<WopiDiscoveryDocumentFactory>());
         }
 
         // This method gets called by the runtime. Use this method to configure the HTTP request pipeline.
@@ -69,48 +76,59 @@ namespace FutureNHS.WOPIHost
 
             app.UseEndpoints(endpoints =>
             {
-                endpoints.MapGet("/collabora",  ctxt => GetCollaboraHostPageAsync(ctxt, app.ApplicationServices.GetRequiredService<IMemoryCache>()));
+                var memoryCache = app.ApplicationServices.GetRequiredService<IMemoryCache>();
+                var wopiDiscoveryDocumentFactory = app.ApplicationServices.GetRequiredService<IWopiDiscoveryDocumentFactory>();
+
+                endpoints.MapGet("/wopi/health-check", GetHealthCheckPageAsync);
+                endpoints.MapGet("/wopi/collabora",  ctxt => GetCollaboraHostPageAsync(ctxt, memoryCache, wopiDiscoveryDocumentFactory));
            });
         }
 
-        private static async Task GetCollaboraHostPageAsync(HttpContext context, IMemoryCache cache)
+        private static async Task GetHealthCheckPageAsync(HttpContext httpContext)
         {
-            if (!cache.TryGetValue<IWopiDiscoveryDocument>("wopi.discovery.document", out var discoveryDoc))
-            {
-                var cancellationToken = context.RequestAborted;
+            var sb = new StringBuilder();
 
-                var builder = new UriBuilder
-                {
-                    Scheme = "http",
-                    Host = "127.0.0.1",
-                    Port = 9980,
-                    Path = Path.Combine("hosting", "discovery")
-                };
+            sb.AppendLine($"<!doctype html>");
+            sb.AppendLine($"<html>");
+            sb.AppendLine($"  <body>");
+            sb.AppendLine($"    <p>");
+            sb.AppendLine($"      =============================================================");
+            sb.AppendLine($"      Hello from the CDS FutureNHS File Server PoC: I seem to be ok");
+            sb.AppendLine($"      =============================================================");
+            sb.AppendLine($"      USE_AZURE_APP_CONFIGURATION = {Environment.GetEnvironmentVariable("USE_AZURE_APP_CONFIGURATION")}");
+            sb.AppendLine($"    </p>");
+            sb.AppendLine($"  </body>");
+            sb.AppendLine($"</html>");
 
-                discoveryDoc = await WopiDiscoveryDocument.GetAsync(builder.Uri, cancellationToken);
+            await httpContext.Response.WriteAsync(sb.ToString());
 
-                if (discoveryDoc is null) return;
+            httpContext.Response.StatusCode = StatusCodes.Status200OK;
+        }
 
-                discoveryDoc = cache.Set("wopi.discovery.document", discoveryDoc, TimeSpan.FromHours(12));
-            }
+        private static async Task GetCollaboraHostPageAsync(HttpContext httpContext, IMemoryCache memoryCache, IWopiDiscoveryDocumentFactory wopiDiscoveryDocumentFactory)
+        {
+            var cancellationToken = httpContext.RequestAborted;
 
-            if (discoveryDoc is null) return;
+            var wopiDiscoveryDocument = await wopiDiscoveryDocumentFactory.CreateDocumentAsync(cancellationToken);
 
-            var fileId = context.Request.Query["file_id"].FirstOrDefault()?.Trim();
+            if (wopiDiscoveryDocument is null) return;  // TODO - Return appropriate status code to caller
 
-            if (string.IsNullOrWhiteSpace(fileId)) return;
+            var fileId = httpContext.Request.Query["file_id"].FirstOrDefault()?.Trim();
 
-            var wopiFileEndpoint = new Uri("http://host.docker.internal:44355/wopi/files/" + fileId, UriKind.Absolute);
+            if (string.IsNullOrWhiteSpace(fileId)) return;  // TODO - Return appropriate status code to caller
+
+            //var wopiServerFileEndpoint = new Uri("https://futurenhs.cds.co.uk/gateway/wopi/host/files/" + fileId, UriKind.Absolute);
+            var wopiServerFileEndpoint = new Uri("http://host.docker.internal:44355/wopi/files/" + fileId, UriKind.Absolute);
 
             var fileExtension = Path.GetExtension(fileId);
 
-            if (string.IsNullOrWhiteSpace(fileExtension)) return;
+            if (string.IsNullOrWhiteSpace(fileExtension)) return;  // TODO - Return appropriate status code to caller
 
             var fileAction = "view"; // edit | view | etc (see comments in discoveryDoc.GetEndpointForAsync)
 
-            var collaboraOnlineEndpoint = await discoveryDoc.GetEndpointForAsync(fileExtension, fileAction, wopiFileEndpoint);
+            var collaboraOnlineEndpoint = await wopiDiscoveryDocument.GetEndpointForFileExtensionAsync(fileExtension, fileAction, wopiServerFileEndpoint);
 
-            if (string.IsNullOrWhiteSpace(collaboraOnlineEndpoint)) return;
+            if (string.IsNullOrWhiteSpace(collaboraOnlineEndpoint)) return;  // TODO - Return appropriate status code to caller
 
             var sb = new StringBuilder();
 
@@ -133,7 +151,9 @@ namespace FutureNHS.WOPIHost
             sb.AppendLine($"  </body>");
             sb.AppendLine($"</html>");
 
-            await context.Response.WriteAsync(sb.ToString());
+            await httpContext.Response.WriteAsync(sb.ToString());
+
+            httpContext.Response.StatusCode = StatusCodes.Status200OK;
         }
     }
 }

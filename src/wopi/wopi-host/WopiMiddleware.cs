@@ -1,15 +1,28 @@
 ﻿using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Caching.Memory;
+using Microsoft.Extensions.DependencyInjection;
+using System.Collections.Generic;
 using System.Threading.Tasks;
 
 namespace FutureNHS.WOPIHost
 {
+    /// <summary>
+    /// Singleton middleware handler for WOPI related requests
+    /// </summary>
     public class WopiMiddleware 
     {
         private readonly RequestDelegate _next;
+        private readonly IMemoryCache _memoryCache;
+        private readonly IWopiRequestFactory _wopiRequestFactory;
+        private readonly IWopiDiscoveryDocumentFactory _wopiDiscoveryDocumentFactory;
 
-        public WopiMiddleware(RequestDelegate next) => _next = next;
-
+        public WopiMiddleware(RequestDelegate next, IMemoryCache memoryCache, IWopiRequestFactory wopiRequestFactory, IWopiDiscoveryDocumentFactory wopiDiscoveryDocumentFactory)
+        {
+            _next = next;
+            _memoryCache = memoryCache;
+            _wopiRequestFactory = wopiRequestFactory;
+            _wopiDiscoveryDocumentFactory = wopiDiscoveryDocumentFactory;
+        }
         public async Task Invoke(HttpContext context)
         {
             await ProcessRequest(context);
@@ -21,23 +34,17 @@ namespace FutureNHS.WOPIHost
 
         private async Task ProcessRequest(HttpContext context)
         {
+            var wopiRequest = _wopiRequestFactory.CreateRequest(context.Request);
+
+            if (wopiRequest.IsEmpty) return; // TODO - Write appropriate response as request is not recognised as valid
+
             var cancellationToken = context.RequestAborted;
 
-            var wopiRequest = WopiRequestFactory.CreateRequest(context.Request, cancellationToken);
+            var wopiDiscoveryDocument = await _wopiDiscoveryDocumentFactory.CreateDocumentAsync(cancellationToken);
 
-            if (wopiRequest.IsEmpty) return;
+            if (await wopiDiscoveryDocument.IsProofKeyInvalidAsync(context.Request)) return; // TODO - Write appropriate response as request is invalid
 
-            var cache = context.RequestServices.GetService(typeof(IMemoryCache)) as IMemoryCache;
-
-            var discoveryDoc = cache.Get<IWopiDiscoveryDocument>("wopi.discovery.document");
-
-            if (discoveryDoc is null) return;
-
-            if (await discoveryDoc.IsProofKeyInvalidAsync(context.Request)) return;
-
-            if (discoveryDoc.IsTainted) cache.Remove("wopi.discovery.document");
-
-            await wopiRequest.HandleAsync(context);
+            await wopiRequest.HandleAsync(context, cancellationToken);
         }
 
         //private sealed class WopiHeaders

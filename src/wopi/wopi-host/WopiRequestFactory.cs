@@ -1,5 +1,6 @@
 ﻿using FutureNHS.WOPIHost.Handlers;
 using Microsoft.AspNetCore.Http;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using System;
 using System.Linq;
@@ -8,15 +9,21 @@ using System.Threading.Tasks;
 
 namespace FutureNHS.WOPIHost
 {
+    public interface IWopiRequestFactory
+    {
+        WopiRequest CreateRequest(HttpRequest request);
+    }
+
     internal sealed class WopiRequestFactory
+        : IWopiRequestFactory
     {
         internal static readonly WopiRequest EMPTY = new EmptyWopiRequest();
 
-        internal static WopiRequest CreateRequest(HttpRequest request, CancellationToken cancellationToken)
+        WopiRequest IWopiRequestFactory.CreateRequest(HttpRequest request)
         {
             var path = request.Path;
 
-            var features = request.HttpContext.RequestServices.GetService(typeof(IOptionsSnapshot<Features>)) as IOptionsSnapshot<Features>;
+            var features = request.HttpContext.RequestServices.GetRequiredService<IOptionsSnapshot<Features>>();
 
             if (path.HasValue && path.StartsWithSegments("/wopi", StringComparison.OrdinalIgnoreCase))
             {
@@ -26,11 +33,11 @@ namespace FutureNHS.WOPIHost
 
                 if (path.StartsWithSegments("/wopi/files", StringComparison.OrdinalIgnoreCase))
                 {
-                    wopiRequest = IdentifyFileRequest(request.Method, path, accessToken, features?.Value, cancellationToken);
+                    wopiRequest = IdentifyFileRequest(request.Method, path, accessToken, features?.Value);
                 }
                 else if (path.StartsWithSegments("/wopi/folders", StringComparison.OrdinalIgnoreCase))
                 {
-                    wopiRequest = IdentifyFolderRequest(request.Method, path, accessToken, cancellationToken);
+                    wopiRequest = IdentifyFolderRequest(request.Method, path, accessToken);
                 }
                 else return EMPTY;
 
@@ -42,7 +49,7 @@ namespace FutureNHS.WOPIHost
             return EMPTY;
         }
 
-        private static WopiRequest IdentifyFileRequest(string method, PathString path, string accessToken, Features features, CancellationToken cancellationToken)
+        private static WopiRequest IdentifyFileRequest(string method, PathString path, string accessToken, Features features)
         {
             var fileId = path.Value.Substring("/wopi/files/".Length)?.Trim();
 
@@ -54,25 +61,25 @@ namespace FutureNHS.WOPIHost
 
                 if (0 == string.Compare("GET", method, StringComparison.OrdinalIgnoreCase))
                 {
-                    return GetFileWopiRequest.With(fileId, accessToken, cancellationToken);
+                    return GetFileWopiRequest.With(fileId, accessToken);
                 }
                 else if (0 == string.Compare("POST", method, StringComparison.OrdinalIgnoreCase))
                 {
-                    return PostFileWopiRequest.With(fileId, accessToken, cancellationToken); ;
+                    return PostFileWopiRequest.With(fileId, accessToken); ;
                 }
             }
             else
             {
                 if (0 == string.Compare("GET", method, StringComparison.OrdinalIgnoreCase))
                 {
-                    return CheckFileInfoWopiRequest.With(fileId, accessToken, features, cancellationToken);
+                    return CheckFileInfoWopiRequest.With(fileId, accessToken, features);
                 }
             }
 
             return EMPTY;
         }
 
-        private static WopiRequest IdentifyFolderRequest(string method, PathString path, string accessToken, CancellationToken cancellationToken)
+        private static WopiRequest IdentifyFolderRequest(string method, PathString path, string accessToken)
         {
             return EMPTY;
         }
@@ -82,7 +89,7 @@ namespace FutureNHS.WOPIHost
         {
             internal EmptyWopiRequest() { }
 
-            protected override Task HandleAsyncImpl(HttpContext context) => throw new NotImplementedException();
+            protected override Task HandleAsyncImpl(HttpContext context, CancellationToken cancellationToken) => throw new NotImplementedException();
         }
     }
 }

@@ -17,7 +17,7 @@ namespace FutureNHS.WOPIHost
     {
         bool IsTainted { get; } 
 
-        Task<string> GetEndpointForAsync(string fileExtension, string action, Uri wopiSrc);
+        Task<string> GetEndpointForFileExtensionAsync(string fileExtension, string action, Uri wopiSrc);
 
         Task<bool> IsProofKeyInvalidAsync(HttpRequest request);
     }
@@ -30,15 +30,20 @@ namespace FutureNHS.WOPIHost
         private readonly Func<DateTimeOffset> _getUtcNow;
         private readonly FileExtensionContentTypeProvider _contentTypeProvider = new FileExtensionContentTypeProvider();
 
-        internal WopiDiscoveryDocument(Uri source, XDocument xml, Func<DateTimeOffset> getUtcNow) { _source = source; _xml = xml; _getUtcNow = getUtcNow; }
+        private WopiDiscoveryDocument(Uri source, XDocument xml, Func<DateTimeOffset> getUtcNow) 
+        { 
+            _source = source;
+            _xml = xml; 
+            _getUtcNow = getUtcNow;
+        }
 
-        internal static async Task<WopiDiscoveryDocument> GetAsync(Uri uri, CancellationToken cancellationToken)
+        internal static async Task<WopiDiscoveryDocument> GetAsync(IHttpClientFactory httpClientFactory, Uri uri, CancellationToken cancellationToken)
         {
             if (uri is null) return default;
 
             if (!uri.IsAbsoluteUri) return default;
 
-            using var client = new HttpClient();
+            using var client = httpClientFactory.CreateClient();
 
             using var request = new HttpRequestMessage(HttpMethod.Get, uri);
 
@@ -48,7 +53,7 @@ namespace FutureNHS.WOPIHost
 
             request.Headers.Add("Accept", accepts);
 
-            using var response = await client.SendAsync(request);
+            using var response = await client.SendAsync(request, cancellationToken);
 
             if (!response.IsSuccessStatusCode) return default;
 
@@ -63,7 +68,7 @@ namespace FutureNHS.WOPIHost
 
         public bool IsTainted { get; private set; }
 
-        async Task<string> IWopiDiscoveryDocument.GetEndpointForAsync(string fileExtension, string action, Uri wopiSrc)
+        async Task<string> IWopiDiscoveryDocument.GetEndpointForFileExtensionAsync(string fileExtension, string action, Uri wopiSrc)
         {
             // https://wopi.readthedocs.io/en/latest/discovery.html
 

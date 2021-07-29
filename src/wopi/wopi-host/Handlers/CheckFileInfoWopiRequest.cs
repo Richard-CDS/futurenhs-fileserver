@@ -1,6 +1,7 @@
 ﻿using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.FeatureManagement;
 using System;
 using System.Dynamic;
@@ -17,8 +18,8 @@ namespace FutureNHS.WOPIHost.Handlers
         private readonly string _fileId;
         private readonly Features _features;
 
-        private CheckFileInfoWopiRequest(string fileId, string accessToken, Features features, CancellationToken cancellationToken) 
-            : base(accessToken, isWriteAccessRequired: false, cancellationToken) 
+        private CheckFileInfoWopiRequest(string fileId, string accessToken, Features features) 
+            : base(accessToken, isWriteAccessRequired: false) 
         {
             if (string.IsNullOrWhiteSpace(fileId)) throw new ArgumentNullException(nameof(fileId));
 
@@ -26,9 +27,9 @@ namespace FutureNHS.WOPIHost.Handlers
             _features = features;
         }
 
-        internal static CheckFileInfoWopiRequest With(string fileId, string accessToken, Features features, CancellationToken cancellationToken) => new CheckFileInfoWopiRequest(fileId, accessToken, features, cancellationToken);
+        internal static CheckFileInfoWopiRequest With(string fileId, string accessToken, Features features) => new CheckFileInfoWopiRequest(fileId, accessToken, features);
 
-        protected override async Task HandleAsyncImpl(HttpContext context)
+        protected override async Task HandleAsyncImpl(HttpContext context, CancellationToken cancellationToken)
         {
             // GET /wopi/files/(file_id) 
             //
@@ -38,9 +39,7 @@ namespace FutureNHS.WOPIHost.Handlers
             // about the capabilities that the WOPI host has on the file. In addition, some CheckFileInfo properties can influence the 
             // appearance and behavior of WOPI clients.
 
-            if (!(context.RequestServices.GetService(typeof(IWebHostEnvironment)) is IWebHostEnvironment hostingEnv)) return;
-
-            if (hostingEnv is null) return;
+            var hostingEnv = context.RequestServices.GetRequiredService<IWebHostEnvironment>();
 
             var filePath = Path.Combine(hostingEnv.ContentRootPath, "Files", _fileId);
 

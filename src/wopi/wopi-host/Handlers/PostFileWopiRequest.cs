@@ -1,5 +1,6 @@
 ﻿using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
+using Microsoft.Extensions.DependencyInjection;
 using System;
 using System.IO;
 using System.Threading;
@@ -12,26 +13,24 @@ namespace FutureNHS.WOPIHost.Handlers
     {
         private readonly string _fileId;
 
-        private PostFileWopiRequest(string fileId, string accessToken, CancellationToken cancellationToken)
-            : base(accessToken, isWriteAccessRequired: true, cancellationToken)
+        private PostFileWopiRequest(string fileId, string accessToken)
+            : base(accessToken, isWriteAccessRequired: true)
         {
             if (string.IsNullOrWhiteSpace(fileId)) throw new ArgumentNullException(nameof(fileId));
 
             _fileId = fileId;
         }
 
-        internal static PostFileWopiRequest With(string fileId, string accessToken, CancellationToken cancellationToken) => new PostFileWopiRequest(fileId, accessToken, cancellationToken);
+        internal static PostFileWopiRequest With(string fileId, string accessToken) => new PostFileWopiRequest(fileId, accessToken);
 
-        protected override async Task HandleAsyncImpl(HttpContext context)
+        protected override async Task HandleAsyncImpl(HttpContext context, CancellationToken cancellationToken)
         {
             // POST /wopi/files/(file_id)/content 
 
             // TODO - This is where we would update the file in our storage repository
             //        taking care of permissions, locking and versioning along the way 
 
-            if (!(context.RequestServices.GetService(typeof(IWebHostEnvironment)) is IWebHostEnvironment hostingEnv)) return;
-
-            if (hostingEnv is null) return;
+            var hostingEnv = context.RequestServices.GetRequiredService<IWebHostEnvironment>();
 
             var filePath = Path.Combine(hostingEnv.ContentRootPath, "Files", _fileId);
 
@@ -41,9 +40,9 @@ namespace FutureNHS.WOPIHost.Handlers
 
             using var fileStrm = File.OpenWrite(filePath + "." + DateTime.UtcNow.ToFileTime());
 
-            await context.Response.StartAsync(_cancellationToken);
+            await context.Response.StartAsync(cancellationToken);
 
-            await pipeReader.CopyToAsync(fileStrm, _cancellationToken); // BUG: Isn't writing the whole file (why?)
+            await pipeReader.CopyToAsync(fileStrm, cancellationToken); // BUG: Isn't writing the whole file (why?)
         }
     }
 }

@@ -16,6 +16,9 @@ namespace FutureNHS.WOPIHost
 
         // Example of how to dynamically handle changes to app config without restarting the application
         // https://docs.microsoft.com/en-us/azure/azure-app-configuration/enable-dynamic-configuration-aspnet-core?tabs=core3x 
+        
+        // Some information on high availability setup for app config service
+        // https://docs.microsoft.com/en-us/azure/azure-app-configuration/concept-disaster-recovery
 
         public static IHostBuilder CreateHostBuilder(string[] args) =>
             Host.CreateDefaultBuilder(args)
@@ -24,9 +27,10 @@ namespace FutureNHS.WOPIHost
                     {
                         var settings = config.Build();
 
-                        // We will want to use the application's managed identity (when hosted in Azure) to connect to the configuration service and key vault
-                        // If running locally and you don't have access to it, populate the AzureAppConfiguration-Primary and optionally the AzureAppConfiguration-Secondary
-                        // configuration values and it will connect using that method instead
+                        // We want to use the application's managed identity (when hosted in Azure) to connect to the configuration service 
+                        // If running locally and your AAD account doesn't have access to it, populate the AzureAppConfiguration:PrimaryConnectionString and optionally 
+                        // the AzureAppConfiguration:SecondaryConnectionString (for multi region failover)
+                        // configuration values and it will connect using that method instead, noting you only need to use read-only keys
 
                         var credential = new DefaultAzureCredential();
 
@@ -34,7 +38,7 @@ namespace FutureNHS.WOPIHost
                         // all configuration without a label, and then override some/all of those setting with those labelled with the 
                         // value held in the ASPNETCORE_ENVIRONMENT variable (production, development etc).
                         // This should allow us to easily manage different config (including feature flags) as we move between environments, 
-                        // but unfortunately, if you are using secrets.json and the variables isn't set to 'Development', the secrets will 
+                        // but unfortunately, if you are using secrets.json locally and the EnvironmentName variable isn't set to 'Development', the secrets will 
                         // not be imported, so either you can't use secrets.json or your env label has to be Development (ie not dev, prod etc)
 
                         // For added resilience in a multi-region configuration, we can add a secondary endpoint to retrieve configuration 
@@ -43,8 +47,8 @@ namespace FutureNHS.WOPIHost
 
                         if (bool.TryParse(Environment.GetEnvironmentVariable("USE_AZURE_APP_CONFIGURATION"), out var useAppConfig) && useAppConfig)
                         {
-                            var secondaryConnectionString = settings.GetConnectionString("AzureAppConfiguration-Secondary");
-                            var secondaryEndpoint = settings["AzureAppConfiguration:SecondaryEndpoint"];
+                            var secondaryConnectionString = settings.GetConnectionString("AzureAppConfiguration:SecondaryRegionReadOnlyConnectionString");
+                            var secondaryEndpoint = settings["AzureAppConfiguration:SecondaryRegionEndpoint"];
 
                             var isMultiRegion = !string.IsNullOrWhiteSpace(secondaryConnectionString) || Uri.IsWellFormedUriString(secondaryEndpoint, UriKind.Absolute);
 
@@ -57,6 +61,9 @@ namespace FutureNHS.WOPIHost
                                 config.AddAzureAppConfiguration(
                                     options =>
                                     {
+                                        // If the connection string is specified in the configuration, use that instead of relying on a 
+                                        // managed identity (which may not work in a local dev environment)
+
                                         if (!string.IsNullOrWhiteSpace(secondaryConnectionString))
                                         {
                                             options = options.Connect(secondaryConnectionString);
@@ -76,12 +83,15 @@ namespace FutureNHS.WOPIHost
                                     );
                             }
 
-                            var primaryConnectionString = settings.GetConnectionString("AzureAppConfiguration-Primary");
-                            var primaryEndpoint = settings["AzureAppConfiguration:PrimaryEndpoint"];
+                            var primaryConnectionString = settings.GetConnectionString("AzureAppConfiguration:PrimaryRegionReadOnlyConnectionString");
+                            var primaryEndpoint = settings["AzureAppConfiguration:PrimaryRegionEndpoint"];
 
                             config.AddAzureAppConfiguration(
                                 options =>
                                 {
+                                    // If the connection string is specified in the configuration, use that instead of relying on a 
+                                    // managed identity (which may not work in a local dev environment)
+
                                     if (!string.IsNullOrWhiteSpace(primaryConnectionString))
                                     {
                                         options = options.Connect(primaryConnectionString);
