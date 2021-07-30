@@ -98,6 +98,22 @@ namespace FutureNHS.WOPIHost
         private static async Task GetProductionErrorPage(HttpContext httpContext)
         {
             httpContext.Response.StatusCode = StatusCodes.Status500InternalServerError;
+
+
+            var sb = new StringBuilder();
+
+            sb.AppendLine($"<!doctype html>");
+            sb.AppendLine($"<html>");
+            sb.AppendLine($"  <body>");
+            sb.AppendLine($"    <p>");
+            sb.AppendLine($"      ==============================/br>");
+            sb.AppendLine($"      Oooops - Internal server error</br>");
+            sb.AppendLine($"      ==============================</br>");
+            sb.AppendLine($"    </p>");
+            sb.AppendLine($"  </body>");
+            sb.AppendLine($"</html>");
+
+            await httpContext.Response.WriteAsync(sb.ToString());
         }
 
         private static async Task GetHealthCheckPageAsync(HttpContext httpContext)
@@ -141,10 +157,9 @@ namespace FutureNHS.WOPIHost
 
             var wopiDiscoveryDocument = await wopiDiscoveryDocumentFactory.CreateDocumentAsync(cancellationToken);
 
-            if (wopiDiscoveryDocument is null) return;  // TODO - Return appropriate status code to caller
+            if (wopiDiscoveryDocument is null) throw new ApplicationException("Unable to download the WOPI Discovery Document - remote host returned non-success status code");  
 
             // Identify the file that we want to view/edit by inspecting the incoming request for an id.  
-            // /wopi/files/<id> would be a good path to use
 
             var fileId = httpContext.Request.Query["file_id"].FirstOrDefault()?.Trim();
 
