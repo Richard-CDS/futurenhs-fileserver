@@ -43,17 +43,13 @@ namespace FutureNHS.WOPIHost
 
             if (wopiDiscoveryDocument is null || wopiDiscoveryDocument.IsTainted)
             {
-                var documentSource = _wopiConfiguration.DiscoveryDocumentSource;
+                var discoveryDocumentEndpoint = _wopiConfiguration.DiscoveryDocumentEndpoint;
 
-                var builder = new UriBuilder
-                {
-                    Scheme = documentSource.Scheme, // "http",
-                    Host = documentSource.Host,     // "127.0.0.1",
-                    Port = documentSource.Port,     // 9980,    
-                    Path = documentSource.Path,     // Path.Combine("hosting", "discovery")
-                };
+                if (!Uri.IsWellFormedUriString(discoveryDocumentEndpoint, UriKind.Absolute)) return default;
 
-                wopiDiscoveryDocument = await WopiDiscoveryDocument.GetAsync(_httpClientFactory, builder.Uri, cancellationToken);
+                var discoveryDocumentUrl = new Uri(discoveryDocumentEndpoint, UriKind.Absolute);
+
+                wopiDiscoveryDocument = await WopiDiscoveryDocument.GetAsync(_httpClientFactory, discoveryDocumentUrl, cancellationToken);
 
                 _memoryCache.TrySetWopiDiscoveryDocument(wopiDiscoveryDocument);
 
