@@ -37,6 +37,11 @@ namespace FutureNHS.WOPIHost.Handlers
 
         protected abstract Task HandleAsyncImpl(HttpContext context, CancellationToken cancellationToken);
 
+        /// <summary>
+        /// TODO - This is where we need to implement our own token validation logic
+        /// At the moment we have a fake guid being passed around but this need to be implemented properly for production
+        /// </summary>
+        /// <returns></returns>
         internal virtual bool IsUnableToValidateAccessToken() => IsEmpty;
     }
 }

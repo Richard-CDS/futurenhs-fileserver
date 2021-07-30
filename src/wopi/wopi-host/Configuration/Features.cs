@@ -1,9 +1,4 @@
-﻿using Microsoft.FeatureManagement;
-using System;
-using System.Configuration;
-using System.Threading.Tasks;
-
-namespace FutureNHS.WOPIHost
+﻿namespace FutureNHS.WOPIHost.Configuration
 {
     /// <summary>
     /// 

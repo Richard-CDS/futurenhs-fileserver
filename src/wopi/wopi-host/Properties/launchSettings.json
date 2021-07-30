@@ -26,7 +26,7 @@
       "launchBrowser": true,
       "launchUrl": "wopi/collabora?file_id=Excel-Spreadsheet.xlsx",
       "environmentVariables": {
-        "USE_AZURE_APP_CONFIGURATION": "true",
+        "USE_AZURE_APP_CONFIGURATION": "false",
         "ASPNETCORE_ENVIRONMENT": "Development"
       },
       "applicationUrl": "http://127.0.0.1:44355"

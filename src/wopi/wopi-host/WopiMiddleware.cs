@@ -7,44 +7,54 @@ using System.Threading.Tasks;
 namespace FutureNHS.WOPIHost
 {
     /// <summary>
-    /// Singleton middleware handler for WOPI related requests
+    /// Singleton middleware handler for WOPI related requests that terminates the pipeline if we have a WOPI request to respond to
     /// </summary>
+    /// <see cref="https://docs.microsoft.com/en-us/aspnet/core/fundamentals/middleware"/>
     public class WopiMiddleware 
     {
         private readonly RequestDelegate _next;
         private readonly IMemoryCache _memoryCache;
-        private readonly IWopiRequestFactory _wopiRequestFactory;
-        private readonly IWopiDiscoveryDocumentFactory _wopiDiscoveryDocumentFactory;
 
-        public WopiMiddleware(RequestDelegate next, IMemoryCache memoryCache, IWopiRequestFactory wopiRequestFactory, IWopiDiscoveryDocumentFactory wopiDiscoveryDocumentFactory)
+        public WopiMiddleware(RequestDelegate next, IMemoryCache memoryCache)
         {
             _next = next;
             _memoryCache = memoryCache;
-            _wopiRequestFactory = wopiRequestFactory;
-            _wopiDiscoveryDocumentFactory = wopiDiscoveryDocumentFactory;
         }
-        public async Task Invoke(HttpContext context)
+        public async Task Invoke(HttpContext httpContext)
         {
-            await ProcessRequest(context);
+            var isWopiRequest = await ProcessRequest(httpContext);
 
-            if (_next is null) return;
+            if (isWopiRequest || _next is null) return;
 
-            await _next.Invoke(context);
+            await _next.Invoke(httpContext);
         }
 
-        private async Task ProcessRequest(HttpContext context)
+        private async Task<bool> ProcessRequest(HttpContext httpContext)
         {
-            var wopiRequest = _wopiRequestFactory.CreateRequest(context.Request);
+            const bool IS_WOPI_REQUEST = true;
+            const bool IS_NOT_WOPI_REQUEST = false;
 
-            if (wopiRequest.IsEmpty) return; // TODO - Write appropriate response as request is not recognised as valid
+            var wopiRequestFactory = httpContext.RequestServices.GetRequiredService<IWopiRequestFactory>();
 
-            var cancellationToken = context.RequestAborted;
+            var wopiRequest = wopiRequestFactory.CreateRequest(httpContext.Request);
 
-            var wopiDiscoveryDocument = await _wopiDiscoveryDocumentFactory.CreateDocumentAsync(cancellationToken);
+            if (wopiRequest.IsEmpty) return IS_NOT_WOPI_REQUEST; 
 
-            if (await wopiDiscoveryDocument.IsProofKeyInvalidAsync(context.Request)) return; // TODO - Write appropriate response as request is invalid
+            var cancellationToken = httpContext.RequestAborted;
 
-            await wopiRequest.HandleAsync(context, cancellationToken);
+            var wopiDiscoveryDocumentFactory = httpContext.RequestServices.GetRequiredService<IWopiDiscoveryDocumentFactory>();
+
+            var wopiDiscoveryDocument = await wopiDiscoveryDocumentFactory.CreateDocumentAsync(cancellationToken);
+
+            if (await wopiDiscoveryDocument.IsProofKeyInvalidAsync(httpContext.Request))
+            {
+                // TODO - Write appropriate response as request is invalid but pertains to a WOPI call
+                return IS_WOPI_REQUEST; 
+            }
+
+            await wopiRequest.HandleAsync(httpContext, cancellationToken);
+
+            return IS_WOPI_REQUEST;
         }
 
         //private sealed class WopiHeaders

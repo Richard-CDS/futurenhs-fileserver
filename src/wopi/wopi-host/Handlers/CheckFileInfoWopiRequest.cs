@@ -1,4 +1,5 @@
-﻿using Microsoft.AspNetCore.Components;
+﻿using FutureNHS.WOPIHost.Configuration;
+using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.DependencyInjection;

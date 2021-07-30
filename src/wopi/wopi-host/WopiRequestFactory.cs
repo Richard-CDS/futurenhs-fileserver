@@ -1,6 +1,6 @@
-﻿using FutureNHS.WOPIHost.Handlers;
+﻿using FutureNHS.WOPIHost.Configuration;
+using FutureNHS.WOPIHost.Handlers;
 using Microsoft.AspNetCore.Http;
-using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using System;
 using System.Linq;
@@ -19,11 +19,16 @@ namespace FutureNHS.WOPIHost
     {
         internal static readonly WopiRequest EMPTY = new EmptyWopiRequest();
 
+        private readonly Features _features;
+
+        public WopiRequestFactory(IOptionsSnapshot<Features> features)
+        {
+            _features = features.Value;
+        }
+
         WopiRequest IWopiRequestFactory.CreateRequest(HttpRequest request)
         {
             var path = request.Path;
-
-            var features = request.HttpContext.RequestServices.GetRequiredService<IOptionsSnapshot<Features>>();
 
             if (path.HasValue && path.StartsWithSegments("/wopi", StringComparison.OrdinalIgnoreCase))
             {
@@ -33,7 +38,7 @@ namespace FutureNHS.WOPIHost
 
                 if (path.StartsWithSegments("/wopi/files", StringComparison.OrdinalIgnoreCase))
                 {
-                    wopiRequest = IdentifyFileRequest(request.Method, path, accessToken, features?.Value);
+                    wopiRequest = IdentifyFileRequest(request.Method, path, accessToken, _features);
                 }
                 else if (path.StartsWithSegments("/wopi/folders", StringComparison.OrdinalIgnoreCase))
                 {

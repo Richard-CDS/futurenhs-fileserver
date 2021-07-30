@@ -1,5 +1,6 @@
 using Azure.Identity;
 using Microsoft.AspNetCore.Hosting;
+using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Configuration.AzureAppConfiguration;
 using Microsoft.Extensions.Hosting;
@@ -11,7 +12,27 @@ namespace FutureNHS.WOPIHost
     {
         public static void Main(string[] args)
         {
-            CreateHostBuilder(args).Build().Run();
+            try
+            {
+                CreateHostBuilder(args).Build().Run();
+            }
+            catch (Azure.RequestFailedException ex)
+            {
+                if (ex.Status == StatusCodes.Status429TooManyRequests)
+                {
+                    // This can happen when the azure app configuration service is throttling requests, although it takes a long time to 
+                    // actually throw the error from the SDK (think this might be because the retry-after response can be up to 24 hours)
+
+                    // Think the best we can do is allow the application to bootstrap using the base configuration and thus potentially degrade
+                    // but then there would be no way to gracefully recover when the app config service comes back online while this app service
+                    // is still running
+
+                    // Will defer for now and come back when we have a better plan, on the assumption we will be moving away from the free tier
+                    // of app config and thus far less likely to hit the problem (1000 daily limit on free, 20000 on standard)
+
+                    throw;
+                }
+            }
         }
 
         // Example of how to dynamically handle changes to app config without restarting the application
@@ -47,6 +68,11 @@ namespace FutureNHS.WOPIHost
 
                         if (bool.TryParse(Environment.GetEnvironmentVariable("USE_AZURE_APP_CONFIGURATION"), out var useAppConfig) && useAppConfig)
                         {
+                            // NB - If the App Configuration Service is being throttled when we start up the application, this method does not appear to ever complete
+                            //      which stops the startup class from bootstrapping the application which then sits in a zombie state until Azure recycles (and round we go).
+                            //      It appears to be a flaw in the Microsoft Extensions and I've been unable to figure out if there is a way to cancel the operation and 
+                            //      fall back to using the local configuration settings. 
+
                             var secondaryConnectionString = settings.GetConnectionString("AzureAppConfiguration:SecondaryRegionReadOnlyConnectionString");
                             var secondaryEndpoint = settings["AzureAppConfiguration:SecondaryRegionEndpoint"];
 
@@ -54,7 +80,9 @@ namespace FutureNHS.WOPIHost
 
                             var environmentLabel = hostingContext.HostingEnvironment.EnvironmentName;
 
-                            var cacheRefreshSchedule = TimeSpan.FromSeconds(5);
+                            var refreshSchedule = settings.GetSection("AzureAppConfiguration").GetValue<int>("CacheExpirationIntervalInSeconds", defaultValue: 60 * 5);
+
+                            var cacheExpirationInterval = refreshSchedule >= 1 ? TimeSpan.FromSeconds(refreshSchedule) : TimeSpan.FromMinutes(5);
 
                             if (isMultiRegion)
                             {
@@ -77,7 +105,7 @@ namespace FutureNHS.WOPIHost
                                                .Select(keyFilter: KeyFilter.Any, labelFilter: environmentLabel)
                                                .ConfigureRefresh(refreshOptions => refreshOptions.Register("FileServer_SentinelKey", refreshAll: true))
                                                .ConfigureKeyVault(kv => kv.SetCredential(credential))
-                                               .UseFeatureFlags(featureFlagOptions => featureFlagOptions.CacheExpirationInterval = cacheRefreshSchedule);
+                                               .UseFeatureFlags(featureFlagOptions => featureFlagOptions.CacheExpirationInterval = cacheExpirationInterval);
                                     },
                                     optional: true
                                     );
@@ -105,9 +133,9 @@ namespace FutureNHS.WOPIHost
                                     options.Select(keyFilter: KeyFilter.Any, labelFilter: LabelFilter.Null)
                                            .Select(keyFilter: KeyFilter.Any, labelFilter: environmentLabel)
                                            .ConfigureRefresh(refreshOptions => refreshOptions.Register("FileServer_SentinelKey", refreshAll: true)
-                                                                                             .SetCacheExpiration(cacheRefreshSchedule))
+                                                                                             .SetCacheExpiration(cacheExpirationInterval))
                                            .ConfigureKeyVault(kv => kv.SetCredential(credential))
-                                           .UseFeatureFlags(featureFlagOptions => featureFlagOptions.CacheExpirationInterval = cacheRefreshSchedule);
+                                           .UseFeatureFlags(featureFlagOptions => featureFlagOptions.CacheExpirationInterval = cacheExpirationInterval);
                                 },
                                 optional: isMultiRegion
                                 );
