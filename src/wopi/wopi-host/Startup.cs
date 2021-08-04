@@ -5,6 +5,7 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Options;
 using Microsoft.FeatureManagement;
 using Microsoft.FeatureManagement.FeatureFilters;
 using System;
@@ -106,7 +107,7 @@ namespace FutureNHS.WOPIHost
             sb.AppendLine($"<html>");
             sb.AppendLine($"  <body>");
             sb.AppendLine($"    <p>");
-            sb.AppendLine($"      ==============================/br>");
+            sb.AppendLine($"      ==============================</br>");
             sb.AppendLine($"      Oooops - Internal server error</br>");
             sb.AppendLine($"      ==============================</br>");
             sb.AppendLine($"    </p>");
@@ -165,18 +166,19 @@ namespace FutureNHS.WOPIHost
 
             if (string.IsNullOrWhiteSpace(fileId)) fileId = "Excel-Spreadsheet.xlsx";
 
-#if DEBUG
-            var wopiServerFileEndpoint = new Uri("http://host.docker.internal:44355/wopi/files/" + fileId, UriKind.Absolute);
-#else
-            var wopiServerFileEndpoint = new Uri("https://futurenhs.cds.co.uk/gateway/wopi/host/files/" + fileId, UriKind.Absolute);
-#endif
+            var wopiConfiguration = httpContext.RequestServices.GetRequiredService<IOptionsSnapshot<WopiConfiguration>>().Value;
+
+            var hostFileEndpointUrl = wopiConfiguration.HostFilesEndpoint;
+
+            var wopiHostFileEndpointUrl = new Uri(Path.Combine(hostFileEndpointUrl, fileId), UriKind.Absolute);
+            
             var fileExtension = Path.GetExtension(fileId);
 
             if (string.IsNullOrWhiteSpace(fileExtension)) return;  // TODO - Return appropriate status code to caller
 
             var fileAction = "view"; // edit | view | etc (see comments in discoveryDoc.GetEndpointForAsync)
 
-            var collaboraOnlineEndpoint = await wopiDiscoveryDocument.GetEndpointForFileExtensionAsync(fileExtension, fileAction, wopiServerFileEndpoint);
+            var collaboraOnlineEndpoint = await wopiDiscoveryDocument.GetEndpointForFileExtensionAsync(fileExtension, fileAction, wopiHostFileEndpointUrl);
 
             if (string.IsNullOrWhiteSpace(collaboraOnlineEndpoint)) return;  // TODO - Return appropriate status code to caller
 
@@ -187,6 +189,8 @@ namespace FutureNHS.WOPIHost
             // When running locally in DEBUG ...
             // https://127.0.0.1:9980/loleaflet/4aa2794/loleaflet.html? is the Collabora endpoint for this document type, pulled out of the discovery xml file hosted by Collabora
             // https://127.0.0.1:44355/wopi/files/<FILE_ID> is the url Collabora uses to callback to us to get the file information and contents
+
+            // In Azure, the container will be mapped to port 80 in docker run command
 
             // TODO - Generate a token with a set TTL that is specific to the current user and file combination
             //        This token will be sent back to us by Collabora by way of it verifying the request (it will be signed so we know it 

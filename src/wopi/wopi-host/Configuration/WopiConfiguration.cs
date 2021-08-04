@@ -2,6 +2,8 @@
 {
     public sealed class WopiConfiguration
     {
-        public string DiscoveryDocumentEndpoint { get; set; }
+        public string ClientDiscoveryDocumentEndpoint { get; set; }
+
+        public string HostFilesEndpoint { get; set; }
     }
 }

@@ -43,11 +43,11 @@ namespace FutureNHS.WOPIHost
 
             if (wopiDiscoveryDocument is null || wopiDiscoveryDocument.IsTainted)
             {
-                var discoveryDocumentEndpoint = _wopiConfiguration.DiscoveryDocumentEndpoint;
+                var ClientDiscoveryDocumentEndpoint = _wopiConfiguration.ClientDiscoveryDocumentEndpoint;
 
-                if (!Uri.IsWellFormedUriString(discoveryDocumentEndpoint, UriKind.Absolute)) return default;
+                if (!Uri.IsWellFormedUriString(ClientDiscoveryDocumentEndpoint, UriKind.Absolute)) return default;
 
-                var discoveryDocumentUrl = new Uri(discoveryDocumentEndpoint, UriKind.Absolute);
+                var discoveryDocumentUrl = new Uri(ClientDiscoveryDocumentEndpoint, UriKind.Absolute);
 
                 wopiDiscoveryDocument = await WopiDiscoveryDocument.GetAsync(_httpClientFactory, discoveryDocumentUrl, cancellationToken);
 
