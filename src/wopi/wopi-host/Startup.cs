@@ -100,7 +100,6 @@ namespace FutureNHS.WOPIHost
         {
             httpContext.Response.StatusCode = StatusCodes.Status500InternalServerError;
 
-
             var sb = new StringBuilder();
 
             sb.AppendLine($"<!doctype html>");

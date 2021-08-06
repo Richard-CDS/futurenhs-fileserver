@@ -37,7 +37,7 @@ namespace FutureNHS.WOPIHost
             _getUtcNow = getUtcNow;
         }
 
-        internal static async Task<WopiDiscoveryDocument> GetAsync(IHttpClientFactory httpClientFactory, Uri uri, CancellationToken cancellationToken)
+        internal static async Task<WopiDiscoveryDocument> GetAsync(IHttpClientFactory httpClientFactory, Uri uri, Uri proxyPrefix, CancellationToken cancellationToken)
         {
             if (uri is null) return default;
 
@@ -52,6 +52,8 @@ namespace FutureNHS.WOPIHost
             var accepts = xmlMediaTypes.Aggregate(string.Empty, (acc, n) => string.Concat(acc, n, ", "))[0..^2];
 
             request.Headers.Add("Accept", accepts);
+
+            if (proxyPrefix is object) request.Headers.Add("ProxyPrefix", proxyPrefix.AbsoluteUri);
 
             using var response = await client.SendAsync(request, cancellationToken);
 
