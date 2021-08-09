@@ -53,7 +53,7 @@ namespace FutureNHS.WOPIHost
 
             request.Headers.Add("Accept", accepts);
 
-            if (proxyPrefix is object) request.Headers.Add("ProxyPrefix", proxyPrefix.AbsoluteUri);
+            //if (proxyPrefix is object) request.Headers.Add("ProxyPrefix", proxyPrefix.AbsoluteUri);
 
             using var response = await client.SendAsync(request, cancellationToken);
 
