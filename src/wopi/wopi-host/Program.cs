@@ -7,9 +7,8 @@ using Microsoft.Extensions.Hosting;
 using System;
 using System.Runtime.CompilerServices;
 
-#if DEBUG
 [assembly: InternalsVisibleTo("FutureNHS-WOPI-Host-UnitTests")]
-#endif
+
 namespace FutureNHS.WOPIHost
 {
     public class Program

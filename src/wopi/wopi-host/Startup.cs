@@ -1,4 +1,5 @@
 using FutureNHS.WOPIHost.Configuration;
+using FutureNHS.WOPIHost.HttpHelpers;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
@@ -9,9 +10,12 @@ using Microsoft.Extensions.Internal;
 using Microsoft.Extensions.Options;
 using Microsoft.FeatureManagement;
 using Microsoft.FeatureManagement.FeatureFilters;
+using Polly;
+using Polly.Extensions.Http;
 using System;
 using System.IO;
 using System.Linq;
+using System.Net.Http;
 using System.Text;
 using System.Threading.Tasks;
 
@@ -26,12 +30,11 @@ namespace FutureNHS.WOPIHost
             _configuration = configuration;
         }
 
-
         // This method gets called by the runtime. Use this method to add services to the container.
         // For more information on how to configure your application, visit https://go.microsoft.com/fwlink/?LinkID=398940
         public void ConfigureServices(IServiceCollection services)
         {
-            services.AddHttpClient();
+            services.AddHttpClient("wopi-discovery-document").AddCoreResiliencyPolicies();
 
             services.AddMemoryCache();
             services.AddLogging();
@@ -55,6 +58,7 @@ namespace FutureNHS.WOPIHost
 
             services.AddSingleton<ISystemClock>(new SystemClock());
 
+            services.AddScoped<RetryHandler>();
             services.AddScoped<WopiRequestFactory>();
             services.AddScoped<IWopiRequestFactory>(sp => sp.GetRequiredService<WopiRequestFactory>());
 

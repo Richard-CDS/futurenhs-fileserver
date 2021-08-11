@@ -59,7 +59,7 @@ namespace FutureNHS.WOPIHost
 
             cancellationToken.ThrowIfCancellationRequested();
 
-            using var client = httpClientFactory.CreateClient();
+            using var client = httpClientFactory.CreateClient("wopi-discovery-document");
 
             using var request = new HttpRequestMessage(HttpMethod.Get, sourceEndpoint);
 
@@ -202,10 +202,11 @@ namespace FutureNHS.WOPIHost
                 }
             }
 
-            // If the string ends with an errant ? or & character, remove it
+            // If the string ends with an errant & character, remove it
+            // Important to note that the string must end with a ? character for things to work correctly when building the 
+            // loleaflet endpoint (undocumented feature!)
 
-            if (urlSrc.EndsWith('?')) urlSrc = urlSrc[0..^1];
-            else if (urlSrc.EndsWith('&')) urlSrc = urlSrc[0..^1];
+            if (urlSrc.EndsWith('&')) urlSrc = urlSrc[0..^1];
 
             return urlSrc;
         }

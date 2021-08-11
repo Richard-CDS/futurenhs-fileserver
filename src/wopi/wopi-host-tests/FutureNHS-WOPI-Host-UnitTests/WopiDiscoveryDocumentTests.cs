@@ -37,9 +37,9 @@ namespace FutureNHS_WOPI_Host_UnitTests
 #if DEBUG
 
         [TestMethod]
-        [DataRow(WOPI_ROOT + "client/loleaflet/4aa2794/loleaflet.html?", WOPI_ROOT + "host/files/filenamegoeshere.docx", WOPI_ROOT + "client/loleaflet/4aa2794/loleaflet.html")]
-        [DataRow(WOPI_ROOT + "client/loleaflet/4aa2794/loleaflet.html?<UNKNOWN_PLACEHOLDER=PLACEHOLDER_VALUE>", WOPI_ROOT + "host/files/filenamegoeshere.docx", WOPI_ROOT + "client/loleaflet/4aa2794/loleaflet.html")]
-        [DataRow(WOPI_ROOT + "client/loleaflet/4aa2794/loleaflet.html?<UNKNOWN_PLACEHOLDER=PLACEHOLDER_VALUE[&]><UNKNOWN_PLACEHOLDER=PLACEHOLDER_VALUE>", WOPI_ROOT + "host/files/filenamegoeshere.docx", WOPI_ROOT + "client/loleaflet/4aa2794/loleaflet.html")]
+        [DataRow(WOPI_ROOT + "client/loleaflet/4aa2794/loleaflet.html?", WOPI_ROOT + "host/files/filenamegoeshere.docx", WOPI_ROOT + "client/loleaflet/4aa2794/loleaflet.html?")]
+        [DataRow(WOPI_ROOT + "client/loleaflet/4aa2794/loleaflet.html?<UNKNOWN_PLACEHOLDER=PLACEHOLDER_VALUE>", WOPI_ROOT + "host/files/filenamegoeshere.docx", WOPI_ROOT + "client/loleaflet/4aa2794/loleaflet.html?")]
+        [DataRow(WOPI_ROOT + "client/loleaflet/4aa2794/loleaflet.html?<UNKNOWN_PLACEHOLDER=PLACEHOLDER_VALUE[&]><UNKNOWN_PLACEHOLDER=PLACEHOLDER_VALUE>", WOPI_ROOT + "host/files/filenamegoeshere.docx", WOPI_ROOT + "client/loleaflet/4aa2794/loleaflet.html?")]
         [DataRow(WOPI_ROOT + "client/loleaflet/4aa2794/loleaflet.html?<WOPI_SRC=PLACEHOLDER_VALUE>", WOPI_ROOT + "host/files/filenamegoeshere.docx", WOPI_ROOT + "client/loleaflet/4aa2794/loleaflet.html?WOPI_SRC=" + WOPI_ROOT + "host/files/filenamegoeshere.docx")]
         [DataRow(WOPI_ROOT + "client/loleaflet/4aa2794/loleaflet.html?<WOPI_SRC=PLACEHOLDER_VALUE[&]>", WOPI_ROOT + "host/files/filenamegoeshere.docx", WOPI_ROOT + "client/loleaflet/4aa2794/loleaflet.html?WOPI_SRC=" + WOPI_ROOT + "host/files/filenamegoeshere.docx")]
         [DataRow(WOPI_ROOT + "client/loleaflet/4aa2794/loleaflet.html?<WOPI_SRC=PLACEHOLDER_VALUE[&]><WOPI_SRC=PLACEHOLDER_VALUE>", WOPI_ROOT + "host/files/filenamegoeshere.docx", WOPI_ROOT + "client/loleaflet/4aa2794/loleaflet.html?WOPI_SRC=" + WOPI_ROOT + "host/files/filenamegoeshere.docx&WOPI_SRC=" + WOPI_ROOT + "host/files/filenamegoeshere.docx")]
