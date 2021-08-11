@@ -3,17 +3,6 @@
     public sealed class WopiConfiguration
     {
         /// <summary>
-        /// If the WOPI client is situation behind a reverse proxy or appliction gateway, Collabora has the ability to use a proxy
-        /// FQDN and path that it will prefix to it's endpoints.  Running locally, this isn't needed, but in Azure is a must.
-        /// </summary>
-        /// <example>
-        /// string.Empty
-        /// https://futurenhs.cds.co.uk/gateway/wopi/client
-        /// </example>
-
-        public string ClientProxyPrefix { get; set; }
-
-        /// <summary>
         /// This is the absolute url for where the discovery document produced by the WOPI client is accessed from
         /// </summary>
         /// <example>

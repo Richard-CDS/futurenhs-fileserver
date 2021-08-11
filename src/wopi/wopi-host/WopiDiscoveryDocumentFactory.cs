@@ -49,13 +49,7 @@ namespace FutureNHS.WOPIHost
 
                 var discoveryDocumentUrl = new Uri(clientDiscoveryDocumentEndpoint, UriKind.Absolute);
 
-                var proxyPrefixEndpoint = _wopiConfiguration.ClientProxyPrefix;
-
-                var proxyPrefix = Uri.IsWellFormedUriString(proxyPrefixEndpoint, UriKind.Absolute)
-                                  ? new Uri(proxyPrefixEndpoint, UriKind.Absolute)
-                                  : default(Uri);
-
-                wopiDiscoveryDocument = await WopiDiscoveryDocument.GetAsync(_httpClientFactory, discoveryDocumentUrl, proxyPrefix, cancellationToken);
+                wopiDiscoveryDocument = await WopiDiscoveryDocument.GetAsync(_httpClientFactory, discoveryDocumentUrl, cancellationToken);
 
                 _memoryCache.TrySetWopiDiscoveryDocument(wopiDiscoveryDocument);
 
