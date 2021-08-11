@@ -1,5 +1,7 @@
 ﻿using FutureNHS.WOPIHost.Configuration;
 using Microsoft.Extensions.Caching.Memory;
+using Microsoft.Extensions.Internal;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using System;
 using System.Net.Http;
@@ -26,15 +28,19 @@ namespace FutureNHS.WOPIHost
     internal sealed class WopiDiscoveryDocumentFactory
         : IWopiDiscoveryDocumentFactory
     {
+        private readonly ISystemClock _systemClock;
+        private readonly ILogger<WopiDiscoveryDocumentFactory> _logger;
         private readonly IMemoryCache _memoryCache;
         private readonly IHttpClientFactory _httpClientFactory;
         private readonly WopiConfiguration _wopiConfiguration;
 
-        public WopiDiscoveryDocumentFactory(IMemoryCache memoryCache, IHttpClientFactory httpClientFactory, IOptionsSnapshot<WopiConfiguration> wopiConfiguration)
+        public WopiDiscoveryDocumentFactory(ISystemClock systemClock, ILogger<WopiDiscoveryDocumentFactory> logger, IMemoryCache memoryCache, IHttpClientFactory httpClientFactory, IOptionsSnapshot<WopiConfiguration> wopiConfiguration)
         {
-            _memoryCache = memoryCache;
-            _httpClientFactory = httpClientFactory;
-            _wopiConfiguration = wopiConfiguration.Value;
+            _logger = logger                              ?? throw new ArgumentNullException(nameof(logger));
+            _systemClock = systemClock                    ?? throw new ArgumentNullException(nameof(systemClock));
+            _memoryCache = memoryCache                    ?? throw new ArgumentNullException(nameof(memoryCache));
+            _httpClientFactory = httpClientFactory        ?? throw new ArgumentNullException(nameof(httpClientFactory));
+            _wopiConfiguration = wopiConfiguration?.Value ?? throw new ArgumentNullException(nameof(wopiConfiguration));
         }
 
         async Task<IWopiDiscoveryDocument> IWopiDiscoveryDocumentFactory.CreateDocumentAsync(CancellationToken cancellationToken)
@@ -49,7 +55,9 @@ namespace FutureNHS.WOPIHost
 
                 var discoveryDocumentUrl = new Uri(clientDiscoveryDocumentEndpoint, UriKind.Absolute);
 
-                wopiDiscoveryDocument = await WopiDiscoveryDocument.GetAsync(_httpClientFactory, discoveryDocumentUrl, cancellationToken);
+                wopiDiscoveryDocument = await WopiDiscoveryDocument.GetAsync(_systemClock, _logger, _httpClientFactory, discoveryDocumentUrl, cancellationToken);
+
+                if (wopiDiscoveryDocument.IsEmpty) wopiDiscoveryDocument = default;
 
                 _memoryCache.TrySetWopiDiscoveryDocument(wopiDiscoveryDocument);
 

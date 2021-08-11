@@ -5,6 +5,7 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Internal;
 using Microsoft.Extensions.Options;
 using Microsoft.FeatureManagement;
 using Microsoft.FeatureManagement.FeatureFilters;
@@ -33,6 +34,14 @@ namespace FutureNHS.WOPIHost
             services.AddHttpClient();
 
             services.AddMemoryCache();
+            services.AddLogging();
+
+            var appInsightsInstrumentationKey = _configuration.GetValue<string>("APPINSIGHTS_INSTRUMENTATIONKEY");
+
+            if (!string.IsNullOrWhiteSpace(appInsightsInstrumentationKey))
+            {
+                services.AddApplicationInsightsTelemetry(appInsightsInstrumentationKey);
+            }
 
             services.AddHttpContextAccessor();
 
@@ -43,6 +52,8 @@ namespace FutureNHS.WOPIHost
 
             services.Configure<Features>(_configuration.GetSection("FeatureManagement"), binderOptions => binderOptions.BindNonPublicProperties = true);
             services.Configure<WopiConfiguration>(_configuration.GetSection("Wopi"));
+
+            services.AddSingleton<ISystemClock>(new SystemClock());
 
             services.AddScoped<WopiRequestFactory>();
             services.AddScoped<IWopiRequestFactory>(sp => sp.GetRequiredService<WopiRequestFactory>());
@@ -177,9 +188,9 @@ namespace FutureNHS.WOPIHost
 
             var fileAction = "view"; // edit | view | etc (see comments in discoveryDoc.GetEndpointForAsync)
 
-            var collaboraOnlineEndpoint = await wopiDiscoveryDocument.GetEndpointForFileExtensionAsync(fileExtension, fileAction, wopiHostFileEndpointUrl);
+            var collaboraOnlineEndpoint = wopiDiscoveryDocument.GetEndpointForFileExtension(fileExtension, fileAction, wopiHostFileEndpointUrl);
 
-            if (string.IsNullOrWhiteSpace(collaboraOnlineEndpoint)) return;  // TODO - Return appropriate status code to caller
+            if (collaboraOnlineEndpoint is null || !collaboraOnlineEndpoint.IsAbsoluteUri) return;  // TODO - Return appropriate status code to caller
 
             var sb = new StringBuilder();
 
@@ -208,7 +219,7 @@ namespace FutureNHS.WOPIHost
             sb.AppendLine($"<!doctype html>");
             sb.AppendLine($"<html>");
             sb.AppendLine($"  <body>");
-            sb.AppendLine($"    <form action=\"{collaboraOnlineEndpoint}\" enctype =\"multipart/form-data\" method=\"post\">");
+            sb.AppendLine($"    <form action=\"{collaboraOnlineEndpoint.AbsoluteUri}\" enctype =\"multipart/form-data\" method=\"post\">");
             sb.AppendLine($"      <input name=\"access_token\" value=\"{ accessToken }\" type=\"hidden\">");
             sb.AppendLine($"      <input type=\"submit\" value=\"Load Document (Collabora)\">");
             sb.AppendLine($"    </form>");

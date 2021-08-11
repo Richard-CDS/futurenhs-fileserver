@@ -1,7 +1,5 @@
 ﻿using Microsoft.AspNetCore.Http;
-using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.DependencyInjection;
-using System.Collections.Generic;
 using System.Threading.Tasks;
 
 namespace FutureNHS.WOPIHost
@@ -13,12 +11,10 @@ namespace FutureNHS.WOPIHost
     public class WopiMiddleware 
     {
         private readonly RequestDelegate _next;
-        private readonly IMemoryCache _memoryCache;
 
-        public WopiMiddleware(RequestDelegate next, IMemoryCache memoryCache)
+        public WopiMiddleware(RequestDelegate next)
         {
             _next = next;
-            _memoryCache = memoryCache;
         }
         public async Task Invoke(HttpContext httpContext)
         {
@@ -31,14 +27,14 @@ namespace FutureNHS.WOPIHost
 
         private async Task<bool> ProcessRequest(HttpContext httpContext)
         {
-            const bool IS_WOPI_REQUEST = true;
-            const bool IS_NOT_WOPI_REQUEST = false;
+            const bool THIS_IS_A_WOPI_REQUEST = true;
+            const bool THIS_IS_NOT_A_WOPI_REQUEST = false;
 
             var wopiRequestFactory = httpContext.RequestServices.GetRequiredService<IWopiRequestFactory>();
 
             var wopiRequest = wopiRequestFactory.CreateRequest(httpContext.Request);
 
-            if (wopiRequest.IsEmpty) return IS_NOT_WOPI_REQUEST; 
+            if (wopiRequest.IsEmpty) return THIS_IS_NOT_A_WOPI_REQUEST; 
 
             var cancellationToken = httpContext.RequestAborted;
 
@@ -46,15 +42,15 @@ namespace FutureNHS.WOPIHost
 
             var wopiDiscoveryDocument = await wopiDiscoveryDocumentFactory.CreateDocumentAsync(cancellationToken);
 
-            if (await wopiDiscoveryDocument.IsProofKeyInvalidAsync(httpContext.Request))
+            if (wopiDiscoveryDocument.IsProofInvalid(httpContext.Request))
             {
                 // TODO - Write appropriate response as request is invalid but pertains to a WOPI call
-                return IS_WOPI_REQUEST; 
+                return THIS_IS_A_WOPI_REQUEST; 
             }
 
             await wopiRequest.HandleAsync(httpContext, cancellationToken);
 
-            return IS_WOPI_REQUEST;
+            return THIS_IS_A_WOPI_REQUEST;
         }
 
         //private sealed class WopiHeaders
