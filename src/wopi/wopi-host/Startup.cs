@@ -138,13 +138,23 @@ namespace FutureNHS.WOPIHost
             sb.AppendLine($"<html>");
             sb.AppendLine($"  <body>");
             sb.AppendLine($"    <p>");
-            sb.AppendLine($"      ============================================</br>");
-            sb.AppendLine($"      Hello from the CDS FutureNHS File Server PoC</br>");
-            sb.AppendLine($"      ============================================</br>");
+            sb.AppendLine($"      ======================================================</br>");
+            sb.AppendLine($"      Hello from the CDS FutureNHS File Server PoC at {DateTime.UtcNow}</br>");
+            sb.AppendLine($"      ======================================================</br>");
             sb.AppendLine($"    </p>");
             sb.AppendLine($"    <p>");
-            sb.AppendLine($"      USE_AZURE_APP_CONFIGURATION = {Environment.GetEnvironmentVariable("USE_AZURE_APP_CONFIGURATION")}");
-            sb.AppendLine($"      UNENCODED_URL = {Environment.GetEnvironmentVariable("UNENCODED_URL")}");
+            sb.AppendLine($"      <h1>Environment Variables</h1></br>");
+            sb.AppendLine($"      USE_AZURE_APP_CONFIGURATION = {Environment.GetEnvironmentVariable("USE_AZURE_APP_CONFIGURATION")}</br>");
+            sb.AppendLine($"      UNENCODED_URL = {Environment.GetEnvironmentVariable("UNENCODED_URL")}</br>");
+            sb.AppendLine($"    </p>");
+            sb.AppendLine($"    <p>");
+            sb.AppendLine($"      <h1>Http Features</h1></br>");
+            
+            foreach (var feature in httpContext.Features)
+            {
+                sb.AppendLine($"      {feature.Key} = {feature.Value}</br>");
+            }
+
             sb.AppendLine($"    </p>");
             sb.AppendLine($"  </body>");
             sb.AppendLine($"</html>");
