@@ -156,6 +156,7 @@ namespace FutureNHS.WOPIHost
                 // https://docs.microsoft.com/en-us/previous-versions/iis/6.0-sdk/ms524602(v=vs.90)?redirectedfrom=MSDN
                 sb.AppendLine($"      UNENCODED_URL = {feature["UNENCODED_URL"] ?? "null"}</br>");                
             }
+            else sb.AppendLine($"      IServerVariablesFeature is missing</br>");
 
             sb.AppendLine($"    </p>");
             sb.AppendLine($"  </body>");
