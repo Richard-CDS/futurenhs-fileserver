@@ -11,6 +11,7 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
+using System.Web;
 using System.Xml.Linq;
 
 namespace FutureNHS.WOPIHost
@@ -41,6 +42,9 @@ namespace FutureNHS.WOPIHost
         private readonly ILogger _logger;
         private readonly FileExtensionContentTypeProvider _contentTypeProvider = new FileExtensionContentTypeProvider();
 
+        private readonly string _publicKeyCspBlob;
+        private readonly string _oldPublicKeyCspBlob;
+
         private WopiDiscoveryDocument() { }
 
         private WopiDiscoveryDocument(Uri source, XDocument xml, ISystemClock systemClock, ILogger logger) 
@@ -49,6 +53,16 @@ namespace FutureNHS.WOPIHost
             _xml = xml                 ?? throw new ArgumentNullException(nameof(xml));
             _systemClock = systemClock ?? throw new ArgumentNullException(nameof(systemClock));
             _logger = logger           ?? throw new ArgumentNullException(nameof(logger));
+
+            // Extract the proof keys from the discovery document, noting there may be two to consider in the event of a key
+            // rotation
+
+            var root = _xml.Element(XName.Get("wopi-discovery"));
+
+            var proofKey = root.Element(XName.Get("proof-key"));
+
+            _publicKeyCspBlob = proofKey.Attribute(XName.Get("value")).Value;
+            _oldPublicKeyCspBlob = proofKey.Attribute(XName.Get("oldvalue")).Value;
         }
 
         internal static async Task<WopiDiscoveryDocument> GetAsync(ISystemClock systemClock, ILogger logger, IHttpClientFactory httpClientFactory, Uri sourceEndpoint, CancellationToken cancellationToken)
@@ -104,6 +118,8 @@ namespace FutureNHS.WOPIHost
             var rootElement = xml.Element(XName.Get("wopi-discovery"));
 
             if (rootElement is null) return false;
+
+            // TODO - Ensure there is a proof key section in the document
 
             return true;
         }
@@ -212,87 +228,78 @@ namespace FutureNHS.WOPIHost
         }
 
 
+        /// <summary>
+        /// Validate WOPI ProofKey to make sure request came from a WOPI client that we trust.
+        /// </summary>
+        /// <param name="request"></param>
+        /// <returns></returns>
+        /// <remarks>
+        /// https://wopi.readthedocs.io/en/latest/scenarios/proofkeys.html 
+        /// </remarks>
         bool IWopiDiscoveryDocument.IsProofInvalid(HttpRequest request)
         {
-            // https://wopi.readthedocs.io/en/latest/scenarios/proofkeys.html
-
             if (IsEmpty) throw new DocumentEmptyException();
-
-            // Validate WOPI ProofKey to make sure request came from the expected server.
 
             const bool PROOF_IS_INVALID = true;
             const bool PROOF_IS_VALID = false;
 
-            var accessToken = request.Query["access_token"].Single().Trim();
+            // First job, pull out the query/header values from the request and encode them into bytes
+            
+            var encodedUrl = new Uri(request.GetEncodedUrl(), UriKind.Absolute);
 
-            var accessTokenBytes = Encoding.UTF8.GetBytes(accessToken);
+            var accessToken = HttpUtility.ParseQueryString(encodedUrl.Query)["access_token"];
+            
+            var encodedAccessToken = HttpUtility.UrlEncode(accessToken);
 
-            var wopiRequestUrl = UriHelper.GetEncodedUrl(request).Trim().ToUpperInvariant();
+            var encodedRequestUrl = request.GetEncodedUrl();
 
-            var wopiRequestUrlBytes = Encoding.UTF8.GetBytes(wopiRequestUrl);
+            var wopiHostUrl = encodedRequestUrl.ToUpperInvariant();
 
             var timestamp = Convert.ToInt64(request.Headers["X-WOPI-Timestamp"].Single().Trim());
 
+            var accessTokenBytes = Encoding.UTF8.GetBytes(encodedAccessToken);
+            var wopiHostUrlBytes = Encoding.UTF8.GetBytes(wopiHostUrl);
             var timestampBytes = BitConverter.GetBytes(timestamp).Reverse().ToArray();
 
-            var proof = new List<byte>(4 + accessTokenBytes.Length + 4 + wopiRequestUrlBytes.Length + 4 + timestampBytes.Length);
+            var proof = new List<byte>(4 + accessTokenBytes.Length + 4 + wopiHostUrlBytes.Length + 4 + timestampBytes.Length);
 
             proof.AddRange(BitConverter.GetBytes(accessTokenBytes.Length).Reverse());
             proof.AddRange(accessTokenBytes);
-            proof.AddRange(BitConverter.GetBytes(wopiRequestUrlBytes.Length).Reverse());
-            proof.AddRange(wopiRequestUrlBytes);
+            proof.AddRange(BitConverter.GetBytes(wopiHostUrlBytes.Length).Reverse());
+            proof.AddRange(wopiHostUrlBytes);
             proof.AddRange(BitConverter.GetBytes(timestampBytes.Length).Reverse());
             proof.AddRange(timestampBytes);
 
             var expectedProof = proof.ToArray();
 
-            // Extract the proof keys from the discovery document, noting there are two to consider in the event of a key
-            // rotation
-
-            var root = _xml.Element(XName.Get("wopi-discovery"));   
-
-            var proofKey = root.Element(XName.Get("proof-key"));
-
-            var key = proofKey.Attribute(XName.Get("value")).Value;
-            var oldKey = proofKey.Attribute(XName.Get("oldvalue")).Value;
-
             var givenProof = request.Headers["X-WOPI-Proof"].Single().Trim();
             var oldGivenProof = request.Headers["X-WOPI-ProofOld"].Single()?.Trim();
 
-            _logger?.LogDebug("WopiDiscoveryDocument-PROOF_CHECK: access_token = {0}", accessToken);
-            _logger?.LogDebug("WopiDiscoveryDocument-PROOF_CHECK: proof-key.value = {0}", key);
-            _logger?.LogDebug("WopiDiscoveryDocument-PROOF_CHECK: proof-key.oldvalue = {0}", oldKey);
+            _logger?.LogDebug("WopiDiscoveryDocument-PROOF_CHECK: request_url = {0}", encodedRequestUrl);
+            _logger?.LogDebug("WopiDiscoveryDocument-PROOF_CHECK: access_token = {0}", encodedAccessToken);
+            _logger?.LogDebug("WopiDiscoveryDocument-PROOF_CHECK: proof-key.value = {0}", _publicKeyCspBlob);
+            _logger?.LogDebug("WopiDiscoveryDocument-PROOF_CHECK: proof-key.oldvalue = {0}", _oldPublicKeyCspBlob);
             _logger?.LogDebug("WopiDiscoveryDocument-PROOF_CHECK: X-WOPI-Timestamp = {0}", timestamp);
             _logger?.LogDebug("WopiDiscoveryDocument-PROOF_CHECK: X-WOPI-Proof = {0}", givenProof);
             _logger?.LogDebug("WopiDiscoveryDocument-PROOF_CHECK: X-WOPI-ProofOld = {0}", oldGivenProof);
 
-            // Verify if the given proof matches what we would expect to see if it has been signed by the current key
+            // Is the proof verifiable using either our current key or the old one?  If not, maybe there is a new key that we 
+            // do not know about, thus we might be able to verify using the old proof with our current key (ie our current key is old
+            // but we are still working with a now outdated discovery document which we need to refresh).
 
-            if (ProofHasBeenVerifiedToBeValid(expectedProof, givenProof, key)) return PROOF_IS_VALID;
+            if (IsProven(expectedProof, givenProof, _publicKeyCspBlob)) return PROOF_IS_VALID;                              // discovery doc is the latest
+            if (IsProven(expectedProof, oldGivenProof, _publicKeyCspBlob)) return PROOF_IS_VALID == (IsTainted = true);     // discovery doc needs to be refreshed
 
-            // It may be that the proof was signed by a key newer than what we know of.  In this case we should see 
-            // another proof signed by the key that is now an old key, but that we still consider to be current
+            // Next scenario is one where our discovery document is up to date, but the proof was generated using an old key and if 
+            // that doesn't work then using the old key to sign the old proof but having the new key fail to validate the new proof
+            // smacks of dodgy shenanigans so I guess we'll just let that one fail
 
-            if (string.IsNullOrWhiteSpace(oldGivenProof)) return PROOF_IS_VALID;
+            if (IsProven(expectedProof, givenProof, _oldPublicKeyCspBlob)) return PROOF_IS_VALID;
 
-            // If the old proof matches with our current key we need to refresh the discovery document
-            // because that is a clear signal there is a new one waiting to be downloaded
-
-            if (ProofHasBeenVerifiedToBeValid(expectedProof, oldGivenProof, key)) return PROOF_IS_VALID == (IsTainted = true);
-
-            // Hmmm, the last valid scenario is that the given proof was signed by the older key, which could 
-            // happen if we recently acquired the discovery document, but the proof was generated before the keys
-            // were rotated.  We'll have a max 20 minutes check on the timestamp to ensure it doesn't linger 
-            // around for longer than we're comfortable with
-
-            var currentTimestamp = _systemClock.UtcNow.Ticks;
-
-            if ((currentTimestamp - timestamp) > TimeSpan.FromMinutes(20).Ticks) return PROOF_IS_INVALID;
-
-            return !ProofHasBeenVerifiedToBeValid(expectedProof, givenProof, oldKey);
+            return PROOF_IS_INVALID;
         }
 
-        private bool ProofHasBeenVerifiedToBeValid(byte[] expectedProof, string signedProof, string publicKeyCspBlob)
+        private bool IsProven(byte[] expectedProof, string signedProof, string publicKeyCspBlob)
         {
             const bool HAS_NOT_BEEN_VERIFIED = false;
 
@@ -302,11 +309,11 @@ namespace FutureNHS.WOPIHost
 
             try
             {
-                using var cryptoProvider = new RSACryptoServiceProvider();
+                using var rsaAlgorithm = new RSACryptoServiceProvider();
 
-                cryptoProvider.ImportCspBlob(publicKey);
+                rsaAlgorithm.ImportCspBlob(publicKey);
 
-                return cryptoProvider.VerifyData(expectedProof, "SHA256", proof);
+                return rsaAlgorithm.VerifyData(expectedProof, "SHA256", proof);
             }
             catch (FormatException) { return HAS_NOT_BEEN_VERIFIED; }
             catch (CryptographicException) { return HAS_NOT_BEEN_VERIFIED; }

@@ -10,12 +10,9 @@ using Microsoft.Extensions.Internal;
 using Microsoft.Extensions.Options;
 using Microsoft.FeatureManagement;
 using Microsoft.FeatureManagement.FeatureFilters;
-using Polly;
-using Polly.Extensions.Http;
 using System;
 using System.IO;
 using System.Linq;
-using System.Net.Http;
 using System.Text;
 using System.Threading.Tasks;
 
@@ -37,7 +34,6 @@ namespace FutureNHS.WOPIHost
             services.AddHttpClient("wopi-discovery-document").AddCoreResiliencyPolicies();
 
             services.AddMemoryCache();
-            services.AddLogging();
 
             var appInsightsInstrumentationKey = _configuration.GetValue<string>("APPINSIGHTS_INSTRUMENTATIONKEY");
 
@@ -45,6 +41,7 @@ namespace FutureNHS.WOPIHost
             {
                 services.AddApplicationInsightsTelemetry(appInsightsInstrumentationKey);
             }
+            else services.AddLogging();
 
             services.AddHttpContextAccessor();
 

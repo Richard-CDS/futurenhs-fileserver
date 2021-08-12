@@ -34,6 +34,8 @@ namespace FutureNHS.WOPIHost
             {
                 var accessToken = request.Query["access_token"].FirstOrDefault();
 
+                if (string.IsNullOrWhiteSpace(accessToken)) return EMPTY;
+
                 WopiRequest wopiRequest;
 
                 if (path.StartsWithSegments("/wopi/files", StringComparison.OrdinalIgnoreCase))

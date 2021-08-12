@@ -7,6 +7,8 @@ namespace FutureNHS.WOPIHost.Handlers
 {
     public abstract class WopiRequest
     {
+        private readonly bool _isWriteAccessRequired = false;
+
         protected WopiRequest() { }
 
         protected WopiRequest(
@@ -14,13 +16,14 @@ namespace FutureNHS.WOPIHost.Handlers
             bool isWriteAccessRequired
             )
         {
-            _accessToken = accessToken ?? string.Empty;
+            if (string.IsNullOrWhiteSpace(accessToken)) throw new ArgumentNullException(nameof(accessToken));
+
+            AccessToken = accessToken;
 
             _isWriteAccessRequired = isWriteAccessRequired;
         }
 
-        private readonly string _accessToken = string.Empty;
-        private readonly bool _isWriteAccessRequired = false;
+        public string AccessToken { get; }
 
         internal bool IsEmpty => ReferenceEquals(this, WopiRequestFactory.EMPTY);
 
