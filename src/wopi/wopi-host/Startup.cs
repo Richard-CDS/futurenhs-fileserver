@@ -145,14 +145,16 @@ namespace FutureNHS.WOPIHost
             sb.AppendLine($"    <p>");
             sb.AppendLine($"      <h1>Environment Variables</h1></br>");
             sb.AppendLine($"      USE_AZURE_APP_CONFIGURATION = {Environment.GetEnvironmentVariable("USE_AZURE_APP_CONFIGURATION")}</br>");
-            sb.AppendLine($"      UNENCODED_URL = {Environment.GetEnvironmentVariable("UNENCODED_URL")}</br>");
             sb.AppendLine($"    </p>");
             sb.AppendLine($"    <p>");
-            sb.AppendLine($"      <h1>Http Features</h1></br>");
-            
-            foreach (var feature in httpContext.Features)
+            sb.AppendLine($"      <h1>Server Variables</h1></br>");
+
+            var feature = httpContext.Features.OfType<Microsoft.AspNetCore.Http.Features.IServerVariablesFeature>().FirstOrDefault();
+
+            if (feature is object)
             {
-                sb.AppendLine($"      {feature.Key} = {feature.Value}</br>");
+                // https://docs.microsoft.com/en-us/previous-versions/iis/6.0-sdk/ms524602(v=vs.90)?redirectedfrom=MSDN
+                sb.AppendLine($"      UNENCODED_URL = {feature["UNENCODED_URL"] ?? "null"}</br>");                
             }
 
             sb.AppendLine($"    </p>");
