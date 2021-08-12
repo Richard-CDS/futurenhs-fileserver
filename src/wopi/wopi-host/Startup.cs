@@ -144,6 +144,7 @@ namespace FutureNHS.WOPIHost
             sb.AppendLine($"    </p>");
             sb.AppendLine($"    <p>");
             sb.AppendLine($"      USE_AZURE_APP_CONFIGURATION = {Environment.GetEnvironmentVariable("USE_AZURE_APP_CONFIGURATION")}");
+            sb.AppendLine($"      UNENCODED_URL = {Environment.GetEnvironmentVariable("UNENCODED_URL")}");
             sb.AppendLine($"    </p>");
             sb.AppendLine($"  </body>");
             sb.AppendLine($"</html>");
