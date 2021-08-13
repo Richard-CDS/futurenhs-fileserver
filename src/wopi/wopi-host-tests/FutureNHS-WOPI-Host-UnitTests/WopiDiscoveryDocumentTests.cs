@@ -1,7 +1,6 @@
 using FutureNHS.WOPIHost;
 using FutureNHS_WOPI_Host_UnitTests.Stubs;
 using Microsoft.AspNetCore.Http;
-using Microsoft.AspNetCore.Http.Extensions;
 using Microsoft.Extensions.Internal;
 using Microsoft.Extensions.Logging;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
@@ -406,7 +405,11 @@ namespace FutureNHS_WOPI_Host_UnitTests
 
             var isProofInvalid = wopiDiscoveryDocument.IsProofInvalid(httpContext.Request);
 
+            var isTainted = wopiDiscoveryDocument.IsTainted;
+
             Assert.IsTrue(isProofInvalid != shouldVerifyCorrectly);
+
+            if (isProofInvalid) Assert.IsTrue(isTainted, "If a proof is deemed invalid, it is expected that the wopi document should have marked itself as a candidate for recycling");
         }
     }
 }

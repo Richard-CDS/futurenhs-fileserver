@@ -296,6 +296,14 @@ namespace FutureNHS.WOPIHost
 
             if (IsProven(expectedProof, givenProof, _oldPublicKeyCspBlob)) return PROOF_IS_VALID;
 
+            // There is a scenario that is impossible for us to distinguish from a potential attack, and that is the one where 
+            // the WOPI client has rotated the keys mutliple times since we last refreshed the discovery document.  CODE generates 
+            // random keys each time a container is created (which is something we will address to enable clustering) so has a similar
+            // 'problem' when running locally.  Safest thing for us to do is to refetch the document whenever somethinbg fails validation
+            // and mitigate the DDoS vector this opens up at the infrastructure level.
+
+            IsTainted = true;
+
             return PROOF_IS_INVALID;
         }
 
