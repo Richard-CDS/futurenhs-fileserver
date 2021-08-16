@@ -5,7 +5,7 @@ namespace FutureNHS.WOPIHost
 {
     public static partial class ExtensionMethods
     {
-        private const string WOPI_DISCOVERY_DOCUMENT_CACHE_KEY = "wopi.discovery.document";
+        internal const string WOPI_DISCOVERY_DOCUMENT_CACHE_KEY = "wopi.discovery.document";
 
         public static bool TrySetWopiDiscoveryDocument(this IMemoryCache memoryCache, IWopiDiscoveryDocument wopiDiscoveryDocument)
         {

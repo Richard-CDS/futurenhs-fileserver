@@ -1,7 +1,6 @@
 using FutureNHS.WOPIHost;
 using FutureNHS_WOPI_Host_UnitTests.Stubs;
 using Microsoft.AspNetCore.Http;
-using Microsoft.Extensions.Internal;
 using Microsoft.Extensions.Logging;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using System;
@@ -16,9 +15,10 @@ namespace FutureNHS_WOPI_Host_UnitTests
     [TestClass]
     public sealed class WopiDiscoveryDocumentTests
     {
-        const string WOPI_ROOT = "https://futurenhs.cds.co.uk/gateway/wopi/";
-        const string WOPI_SRC = WOPI_ROOT + "host/files/documentnamegoeshere.docx";
-        const string WOPI_DISCOVERY_DOCUMENT_XML = 
+        internal const string WOPI_ROOT = "https://futurenhs.cds.co.uk/gateway/wopi/";
+        internal const string WOPI_FILE_SRC = WOPI_ROOT + "host/files/documentnamegoeshere.docx";
+        internal const string WOPI_DISCOVERY_DOCUMENT_URL = WOPI_ROOT + "client/hosting/discovery";
+        internal const string WOPI_DISCOVERY_DOCUMENT_XML = 
             "<wopi-discovery>" + 
               "<net-zone name=\"external-http\">" + 
                 "<app name=\"writer\">" + 
@@ -54,38 +54,12 @@ namespace FutureNHS_WOPI_Host_UnitTests
 #endif
 
         [TestMethod]
-        public async Task GetAsync_ReturnsEmptyDocumentWhenAbsoluteSourceEndpointIsNotKnown()
-        {
-            var cancellationToken = new CancellationToken();
-
-            var systemClock = new SystemClock();
-            
-            var httpClientFactory = new Moq.Mock<IHttpClientFactory>().Object;
-
-            var logger = new Moq.Mock<ILogger>().Object;
-
-            var sourceEndpoint = default(Uri);
-
-            var wopiDiscoveryDocument = await WopiDiscoveryDocument.GetAsync(systemClock, logger, httpClientFactory, sourceEndpoint, cancellationToken);
-
-            Assert.AreSame(WopiDiscoveryDocument.Empty, wopiDiscoveryDocument, "Discovery document should be empty when the endpoint URL is not known");
-
-            sourceEndpoint = new Uri("/relative/path", UriKind.Relative);
-
-            wopiDiscoveryDocument = await WopiDiscoveryDocument.GetAsync(systemClock, logger, httpClientFactory, sourceEndpoint, cancellationToken);
-
-            Assert.AreSame(WopiDiscoveryDocument.Empty, wopiDiscoveryDocument, "Discovery document should be empty when the endpoint URL is not an absolute uri");
-        }        
-
-        [TestMethod]
         [ExpectedException(typeof(OperationCanceledException))]
         public async Task GetAsync_ThrowsWhenCancellationTokenCancelled()
         {
             using var cts = new CancellationTokenSource();
 
             cts.Cancel();
-
-            var systemClock = new SystemClock();
 
             var logger = new Moq.Mock<ILogger>().Object;
 
@@ -103,19 +77,13 @@ namespace FutureNHS_WOPI_Host_UnitTests
 
             var httpClient = new HttpClient(httpMessageHandler, true);
 
-            var httpClientFactory = new Moq.Mock<IHttpClientFactory>();
-
-            httpClientFactory.Setup(x => x.CreateClient(Moq.It.IsAny<string>())).Returns(httpClient);
-
-            await WopiDiscoveryDocument.GetAsync(systemClock, logger, httpClientFactory.Object, sourceEndpoint, cts.Token);
+            await WopiDiscoveryDocument.GetAsync(httpClient, sourceEndpoint, logger, cts.Token);
         }
 
         [TestMethod]
-        public async Task GetAsync_UsesHttpClientFromFactoryAndConstructsExpectedRequest()
+        public async Task GetAsync_ConstructsExpectedRequestToWopiClient()
         {
             var cancellationToken = new CancellationToken();
-
-            var systemClock = new SystemClock();
 
             var logger = new Moq.Mock<ILogger>().Object;
 
@@ -135,26 +103,64 @@ namespace FutureNHS_WOPI_Host_UnitTests
                     Assert.IsTrue(request.Headers.Accept.Contains(new MediaTypeWithQualityHeaderValue("application/xml")), "Expected the accept header to be set to retrieve an xml document");
                     Assert.IsTrue(request.Headers.Accept.Contains(new MediaTypeWithQualityHeaderValue("text/xml")), "Expected the accept header to be set to retrieve an xml document");
 
+                    Assert.AreEqual(HttpMethods.Get, request.Method.Method, "Expected the document to generate a GET request to the discovery document endpoint");
+
                     return httpResponseMessage;
                     });
 
             var httpClient = new HttpClient(httpMessageHandler, true);
 
-            var httpClientFactory = new Moq.Mock<IHttpClientFactory>();
-
-            httpClientFactory.Setup(x => x.CreateClient(Moq.It.IsAny<string>())).Returns(httpClient);
-
-            await WopiDiscoveryDocument.GetAsync(systemClock, logger, httpClientFactory.Object, sourceEndpoint, cancellationToken);
+            await WopiDiscoveryDocument.GetAsync(httpClient, sourceEndpoint, logger, cancellationToken);
 
             Assert.IsTrue(messageHandlerInvoked, "Expected the stubbed request message handler to have been invoked to retrieve the xml document from the WOPI client");
+        }
+
+        [TestMethod]
+        public async Task GetAsync_ReturnsEmptyDocumentWhenAbsoluteSourceEndpointIsNotKnown()
+        {
+            var cancellationToken = new CancellationToken();
+
+            var httpClient = new Moq.Mock<HttpClient>().Object;
+
+            var logger = new Moq.Mock<ILogger>().Object;
+
+            var sourceEndpoint = default(Uri);
+
+            var wopiDiscoveryDocument = await WopiDiscoveryDocument.GetAsync(httpClient, sourceEndpoint, logger, cancellationToken);
+
+            Assert.AreSame(WopiDiscoveryDocument.Empty, wopiDiscoveryDocument, "Discovery document should be empty when the endpoint URL is not known");
+
+            sourceEndpoint = new Uri("/relative/path", UriKind.Relative);
+
+            wopiDiscoveryDocument = await WopiDiscoveryDocument.GetAsync(httpClient, sourceEndpoint, logger, cancellationToken);
+
+            Assert.AreSame(WopiDiscoveryDocument.Empty, wopiDiscoveryDocument, "Discovery document should be empty when the endpoint URL is not an absolute uri");
+        }
+
+        [TestMethod]
+        public async Task GetAsync_ReturnsEmptyDocumentIfFailureStatusCodeReturnedFromWopiClient()
+        {
+            var cancellationToken = new CancellationToken();
+
+            var logger = new Moq.Mock<ILogger>().Object;
+
+            var sourceEndpoint = new Uri(WOPI_ROOT + "client/hosting/discovery", UriKind.Absolute);
+
+            var httpResponseMessage = new HttpResponseMessage(System.Net.HttpStatusCode.BadRequest);
+
+            var httpMessageHandler = new HttpMessageHandlerStub((request, _) => httpResponseMessage);
+
+            var httpClient = new HttpClient(httpMessageHandler, true);
+
+            var wopiDiscoveryDocument = await WopiDiscoveryDocument.GetAsync(httpClient, sourceEndpoint, logger, cancellationToken);
+
+            Assert.AreSame(WopiDiscoveryDocument.Empty, wopiDiscoveryDocument);
         }
 
         [TestMethod]
         public async Task GetAsync_ReturnsEmptyDocumentIfResponseContentTypeHeaderIsMissing()
         {
             var cancellationToken = new CancellationToken();
-
-            var systemClock = new SystemClock();
 
             var logger = new Moq.Mock<ILogger>().Object;
 
@@ -166,11 +172,7 @@ namespace FutureNHS_WOPI_Host_UnitTests
 
             var httpClient = new HttpClient(httpMessageHandler, true);
 
-            var httpClientFactory = new Moq.Mock<IHttpClientFactory>();
-
-            httpClientFactory.Setup(x => x.CreateClient(Moq.It.IsAny<string>())).Returns(httpClient);
-
-            var wopiDiscoveryDocument = await WopiDiscoveryDocument.GetAsync(systemClock, logger, httpClientFactory.Object, sourceEndpoint, cancellationToken);
+            var wopiDiscoveryDocument = await WopiDiscoveryDocument.GetAsync(httpClient, sourceEndpoint, logger, cancellationToken);
 
             Assert.AreSame(WopiDiscoveryDocument.Empty, wopiDiscoveryDocument);
         }
@@ -179,8 +181,6 @@ namespace FutureNHS_WOPI_Host_UnitTests
         public async Task GetAsync_ReturnsEmptyDocumentIfResponseContentTypeHeaderIsNotSupported()
         {
             var cancellationToken = new CancellationToken();
-
-            var systemClock = new SystemClock();
 
             var logger = new Moq.Mock<ILogger>().Object;
 
@@ -194,51 +194,15 @@ namespace FutureNHS_WOPI_Host_UnitTests
 
             var httpClient = new HttpClient(httpMessageHandler, true);
 
-            var httpClientFactory = new Moq.Mock<IHttpClientFactory>();
-
-            httpClientFactory.Setup(x => x.CreateClient(Moq.It.IsAny<string>())).Returns(httpClient);
-
-            var wopiDiscoveryDocument = await WopiDiscoveryDocument.GetAsync(systemClock, logger, httpClientFactory.Object, sourceEndpoint, cancellationToken);
+            var wopiDiscoveryDocument = await WopiDiscoveryDocument.GetAsync(httpClient, sourceEndpoint, logger, cancellationToken);
 
             Assert.AreSame(WopiDiscoveryDocument.Empty, wopiDiscoveryDocument);
-        }
-
-        [TestMethod]
-        public async Task GetAsync_ReturnsPrimedDocumentForValidWopiClientXmlResponse()
-        {
-            var cancellationToken = new CancellationToken();
-
-            var systemClock = new SystemClock();
-
-            var logger = new Moq.Mock<ILogger>().Object;
-
-            var sourceEndpoint = new Uri(WOPI_ROOT + "client/hosting/discovery", UriKind.Absolute);
-
-            var httpResponseMessage = new HttpResponseMessage(System.Net.HttpStatusCode.OK)
-            {
-                Content = new StringContent(WOPI_DISCOVERY_DOCUMENT_XML, Encoding.UTF8, "application/xml")
-            };
-
-            var httpMessageHandler = new HttpMessageHandlerStub((request, _) => httpResponseMessage);
-
-            var httpClient = new HttpClient(httpMessageHandler, true);
-
-            var httpClientFactory = new Moq.Mock<IHttpClientFactory>();
-
-            httpClientFactory.Setup(x => x.CreateClient(Moq.It.IsAny<string>())).Returns(httpClient);
-
-            var wopiDiscoveryDocument = await WopiDiscoveryDocument.GetAsync(systemClock, logger, httpClientFactory.Object, sourceEndpoint, cancellationToken);
-
-            Assert.IsFalse(wopiDiscoveryDocument.IsEmpty);
-            Assert.IsFalse(wopiDiscoveryDocument.IsTainted);
         }
 
         [TestMethod]
         public async Task GetAsync_ReturnsEmptyDocumentForInvalidWopiClientXmlResponse()
         {
             var cancellationToken = new CancellationToken();
-
-            var systemClock = new SystemClock();
 
             var logger = new Moq.Mock<ILogger>().Object;
 
@@ -253,24 +217,70 @@ namespace FutureNHS_WOPI_Host_UnitTests
 
             var httpClient = new HttpClient(httpMessageHandler, true);
 
-            var httpClientFactory = new Moq.Mock<IHttpClientFactory>();
-
-            httpClientFactory.Setup(x => x.CreateClient(Moq.It.IsAny<string>())).Returns(httpClient);
-
-            var wopiDiscoveryDocument = await WopiDiscoveryDocument.GetAsync(systemClock, logger, httpClientFactory.Object, sourceEndpoint, cancellationToken);
+            var wopiDiscoveryDocument = await WopiDiscoveryDocument.GetAsync(httpClient, sourceEndpoint, logger, cancellationToken);
 
             Assert.IsTrue(wopiDiscoveryDocument.IsEmpty);
+        }
+
+        [TestMethod]
+        public async Task GetAsync_ReturnsEmptyDocumentIfConnectionToWopiClientCannotBeEstablished()
+        {
+            var cancellationToken = new CancellationToken();
+
+            var logger = new Moq.Mock<ILogger>().Object;
+
+            var sourceEndpoint = new Uri(WOPI_ROOT + "client/hosting/discovery", UriKind.Absolute);
+
+            var httpMessageHandler = new HttpMessageHandlerStub((request, _) => throw new HttpRequestException("Mimicing failure to connect to remote host"));
+
+            var httpClient = new HttpClient(httpMessageHandler, true);
+
+            var wopiDiscoveryDocument = await WopiDiscoveryDocument.GetAsync(httpClient, sourceEndpoint, logger, cancellationToken);
+
+            Assert.IsTrue(wopiDiscoveryDocument.IsEmpty);
+        }
+
+        [TestMethod]
+        public async Task GetAsync_ReturnsPrimedDocumentForValidWopiClientXmlResponse()
+        {
+            var cancellationToken = new CancellationToken();
+
+            var logger = new Moq.Mock<ILogger>().Object;
+
+            var sourceEndpoint = new Uri(WOPI_ROOT + WOPI_DISCOVERY_DOCUMENT_URL, UriKind.Absolute);
+
+            var httpResponseMessage = new HttpResponseMessage(System.Net.HttpStatusCode.OK)
+            {
+                Content = new StringContent(WOPI_DISCOVERY_DOCUMENT_XML, Encoding.UTF8, "application/xml")
+            };
+
+            var httpMessageHandler = new HttpMessageHandlerStub((request, _) => httpResponseMessage);
+
+            var httpClient = new HttpClient(httpMessageHandler, true);
+
+            var wopiDiscoveryDocument = await WopiDiscoveryDocument.GetAsync(httpClient, sourceEndpoint, logger, cancellationToken);
+
+            Assert.IsNotNull(wopiDiscoveryDocument);
+            Assert.IsFalse(wopiDiscoveryDocument.IsEmpty);
+            Assert.IsFalse(wopiDiscoveryDocument.IsTainted);
         }
 
 
 
 
         [TestMethod]
+        [ExpectedException(typeof(DocumentEmptyException))]
+        public void GetEndpointForFileExtension_ThrowsIfDocumentIsEmpty()
+        {
+            IWopiDiscoveryDocument wopiDiscoveryDocument = WopiDiscoveryDocument.Empty;
+
+            _ = wopiDiscoveryDocument.GetEndpointForFileExtension("docx", "edit", new Uri(WOPI_FILE_SRC, UriKind.Absolute));
+        }
+
+        [TestMethod]
         public async Task GetEndpointForFileExtension_ReturnsCorrectEndpointForBothKnownAndUnknownFileExtensions()
         {
             var cancellationToken = new CancellationToken();
-
-            var systemClock = new SystemClock();
 
             var logger = new Moq.Mock<ILogger>().Object;
 
@@ -285,29 +295,16 @@ namespace FutureNHS_WOPI_Host_UnitTests
 
             var httpClient = new HttpClient(httpMessageHandler, true);
 
-            var httpClientFactory = new Moq.Mock<IHttpClientFactory>();
+            IWopiDiscoveryDocument wopiDiscoveryDocument = await WopiDiscoveryDocument.GetAsync(httpClient, sourceEndpoint, logger, cancellationToken);
 
-            httpClientFactory.Setup(x => x.CreateClient(Moq.It.IsAny<string>())).Returns(httpClient);
-
-            IWopiDiscoveryDocument wopiDiscoveryDocument = await WopiDiscoveryDocument.GetAsync(systemClock, logger, httpClientFactory.Object, sourceEndpoint, cancellationToken);
-
-            var endpoint = wopiDiscoveryDocument.GetEndpointForFileExtension("docx", "edit", new Uri(WOPI_SRC, UriKind.Absolute));
+            var endpoint = wopiDiscoveryDocument.GetEndpointForFileExtension("docx", "edit", new Uri(WOPI_FILE_SRC, UriKind.Absolute));
 
             Assert.IsNotNull(endpoint, "Expected the endpoint to be returned when it is supported by the wopi client");
             Assert.IsTrue(endpoint.IsAbsoluteUri, "The endpoint should be an absolute uri for supported file extensions");
 
-            endpoint = wopiDiscoveryDocument.GetEndpointForFileExtension("fakefileextension", "edit", new Uri(WOPI_SRC, UriKind.Absolute));
+            endpoint = wopiDiscoveryDocument.GetEndpointForFileExtension("fakefileextension", "edit", new Uri(WOPI_FILE_SRC, UriKind.Absolute));
 
             Assert.IsNull(endpoint, "Expected a null return value when the file extension is not supported by the wopi client");
-        }
-
-        [TestMethod]
-        [ExpectedException(typeof(DocumentEmptyException))]
-        public void GetEndpointForFileExtension_ThrowsIfDocumentIsEmpty()
-        {
-            IWopiDiscoveryDocument wopiDiscoveryDocument = WopiDiscoveryDocument.Empty;
-
-            _ = wopiDiscoveryDocument.GetEndpointForFileExtension("docx", "edit", new Uri(WOPI_SRC, UriKind.Absolute));
         }
 
 
@@ -322,8 +319,6 @@ namespace FutureNHS_WOPI_Host_UnitTests
 
             _ = wopiDiscoveryDocument.IsProofInvalid(httpContext.Request);
         }
-
-
 
         [TestMethod]
         // should verify correctly using X-WOPI-Proof and Current Key from Discovery
@@ -370,8 +365,6 @@ namespace FutureNHS_WOPI_Host_UnitTests
 
             var cancellationToken = new CancellationToken();
 
-            var systemClock = new SystemClock();
-
             var logger = new Moq.Mock<ILogger>().Object;
 
             var sourceEndpoint = new Uri(WOPI_ROOT + "client/hosting/discovery", UriKind.Absolute);
@@ -397,11 +390,7 @@ namespace FutureNHS_WOPI_Host_UnitTests
 
             var httpClient = new HttpClient(httpMessageHandler, true);
 
-            var httpClientFactory = new Moq.Mock<IHttpClientFactory>();
-
-            httpClientFactory.Setup(x => x.CreateClient(Moq.It.IsAny<string>())).Returns(httpClient);
-
-            IWopiDiscoveryDocument wopiDiscoveryDocument = await WopiDiscoveryDocument.GetAsync(systemClock, logger, httpClientFactory.Object, sourceEndpoint, cancellationToken);
+            IWopiDiscoveryDocument wopiDiscoveryDocument = await WopiDiscoveryDocument.GetAsync(httpClient, sourceEndpoint, logger, cancellationToken);
 
             var isProofInvalid = wopiDiscoveryDocument.IsProofInvalid(httpContext.Request);
 

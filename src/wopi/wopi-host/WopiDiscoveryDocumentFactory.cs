@@ -1,6 +1,5 @@
 ﻿using FutureNHS.WOPIHost.Configuration;
 using Microsoft.Extensions.Caching.Memory;
-using Microsoft.Extensions.Internal;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using System;
@@ -25,19 +24,17 @@ namespace FutureNHS.WOPIHost
     /// It is important to note that this pair of keys can be recycled and when this happens we need to refresh the 
     /// document direct from source to get the new details (the old keys stay alive for a short period)
     /// </remarks>
-    internal sealed class WopiDiscoveryDocumentFactory
+    public sealed class WopiDiscoveryDocumentFactory
         : IWopiDiscoveryDocumentFactory
     {
-        private readonly ISystemClock _systemClock;
         private readonly ILogger<WopiDiscoveryDocumentFactory> _logger;
         private readonly IMemoryCache _memoryCache;
         private readonly IHttpClientFactory _httpClientFactory;
         private readonly WopiConfiguration _wopiConfiguration;
 
-        public WopiDiscoveryDocumentFactory(ISystemClock systemClock, ILogger<WopiDiscoveryDocumentFactory> logger, IMemoryCache memoryCache, IHttpClientFactory httpClientFactory, IOptionsSnapshot<WopiConfiguration> wopiConfiguration)
+        public WopiDiscoveryDocumentFactory(IMemoryCache memoryCache, IHttpClientFactory httpClientFactory, IOptionsSnapshot<WopiConfiguration> wopiConfiguration, ILogger<WopiDiscoveryDocumentFactory> logger)
         {
             _logger = logger                              ?? throw new ArgumentNullException(nameof(logger));
-            _systemClock = systemClock                    ?? throw new ArgumentNullException(nameof(systemClock));
             _memoryCache = memoryCache                    ?? throw new ArgumentNullException(nameof(memoryCache));
             _httpClientFactory = httpClientFactory        ?? throw new ArgumentNullException(nameof(httpClientFactory));
             _wopiConfiguration = wopiConfiguration?.Value ?? throw new ArgumentNullException(nameof(wopiConfiguration));
@@ -45,26 +42,31 @@ namespace FutureNHS.WOPIHost
 
         async Task<IWopiDiscoveryDocument> IWopiDiscoveryDocumentFactory.CreateDocumentAsync(CancellationToken cancellationToken)
         {
+            cancellationToken.ThrowIfCancellationRequested();
+
             _memoryCache.TryGetWopiDiscoveryDocument(out var wopiDiscoveryDocument);
 
             if (wopiDiscoveryDocument is null || wopiDiscoveryDocument.IsTainted)
             {
                 var clientDiscoveryDocumentEndpoint = _wopiConfiguration.ClientDiscoveryDocumentEndpoint;
 
-                if (!Uri.IsWellFormedUriString(clientDiscoveryDocumentEndpoint, UriKind.Absolute)) return default;
+                if (Uri.IsWellFormedUriString(clientDiscoveryDocumentEndpoint, UriKind.Absolute))
+                {
+                    var discoveryDocumentUrl = new Uri(clientDiscoveryDocumentEndpoint, UriKind.Absolute);
 
-                var discoveryDocumentUrl = new Uri(clientDiscoveryDocumentEndpoint, UriKind.Absolute);
+                    var httpClient = _httpClientFactory.CreateClient("wopi-discovery-document");
 
-                wopiDiscoveryDocument = await WopiDiscoveryDocument.GetAsync(_systemClock, _logger, _httpClientFactory, discoveryDocumentUrl, cancellationToken);
+                    wopiDiscoveryDocument = await WopiDiscoveryDocument.GetAsync(httpClient, discoveryDocumentUrl, _logger, cancellationToken);
 
-                if (wopiDiscoveryDocument.IsEmpty) wopiDiscoveryDocument = default;
+                    cancellationToken.ThrowIfCancellationRequested();
 
-                _memoryCache.TrySetWopiDiscoveryDocument(wopiDiscoveryDocument);
+                    if (wopiDiscoveryDocument.IsEmpty) wopiDiscoveryDocument = default;
 
-                return wopiDiscoveryDocument;
+                    _memoryCache.TrySetWopiDiscoveryDocument(wopiDiscoveryDocument);
+                }
             }
 
-            return wopiDiscoveryDocument;
+            return wopiDiscoveryDocument ?? WopiDiscoveryDocument.Empty;
         }
 
     }

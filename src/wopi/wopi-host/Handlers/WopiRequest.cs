@@ -7,14 +7,13 @@ namespace FutureNHS.WOPIHost.Handlers
 {
     public abstract class WopiRequest
     {
+        internal static readonly WopiRequest EMPTY = new EmptyWopiRequest();
+
         private readonly bool _isWriteAccessRequired = false;
 
         protected WopiRequest() { }
 
-        protected WopiRequest(
-            string accessToken,
-            bool isWriteAccessRequired
-            )
+        protected WopiRequest(string accessToken, bool isWriteAccessRequired)
         {
             if (string.IsNullOrWhiteSpace(accessToken)) throw new ArgumentNullException(nameof(accessToken));
 
@@ -25,7 +24,7 @@ namespace FutureNHS.WOPIHost.Handlers
 
         public string AccessToken { get; }
 
-        internal bool IsEmpty => ReferenceEquals(this, WopiRequestFactory.EMPTY);
+        internal bool IsEmpty => ReferenceEquals(this, WopiRequest.EMPTY);
 
         internal Task HandleAsync(HttpContext context, CancellationToken cancellationToken)
         {
@@ -46,5 +45,12 @@ namespace FutureNHS.WOPIHost.Handlers
         /// </summary>
         /// <returns></returns>
         internal virtual bool IsUnableToValidateAccessToken() => IsEmpty;
+
+        private sealed class EmptyWopiRequest : WopiRequest
+        {
+            internal EmptyWopiRequest() { }
+
+            protected override Task HandleAsyncImpl(HttpContext context, CancellationToken cancellationToken) => throw new NotImplementedException();
+        }
     }
 }

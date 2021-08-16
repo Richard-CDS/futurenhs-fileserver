@@ -57,6 +57,7 @@ namespace FutureNHS.WOPIHost
 
             services.AddScoped<RetryHandler>();
             services.AddScoped<WopiRequestFactory>();
+
             services.AddScoped<IWopiRequestFactory>(sp => sp.GetRequiredService<WopiRequestFactory>());
 
             services.AddScoped<WopiDiscoveryDocumentFactory>();
@@ -183,7 +184,7 @@ namespace FutureNHS.WOPIHost
 
             var wopiDiscoveryDocument = await wopiDiscoveryDocumentFactory.CreateDocumentAsync(cancellationToken);
 
-            if (wopiDiscoveryDocument is null) throw new ApplicationException("Unable to download the WOPI Discovery Document - remote host returned non-success status code");  
+            if (wopiDiscoveryDocument.IsEmpty) throw new ApplicationException("Unable to download the WOPI Discovery Document - remote host is either unavailable or returned non-success status code");  
 
             // Identify the file that we want to view/edit by inspecting the incoming request for an id.  
 

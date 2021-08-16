@@ -1,5 +1,6 @@
 ﻿using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.DependencyInjection;
+using System;
 using System.Threading.Tasks;
 
 namespace FutureNHS.WOPIHost
@@ -16,19 +17,38 @@ namespace FutureNHS.WOPIHost
         {
             _next = next;
         }
+
         public async Task Invoke(HttpContext httpContext)
         {
+            if (httpContext is null) throw new ArgumentNullException(nameof(httpContext));
+
             var isWopiRequest = await ProcessRequest(httpContext);
 
-            if (isWopiRequest || _next is null) return;
+            if (_next is null) return;
 
+            // TODO
+            // Not exactly sure what to do to avoid an error being thrown here.  Presume it is to do with injecting the 
+            // middleware in the wrong place but doesn't appear to be any actual side effects.  
+            // The next item is the routing middleware and it causes an InvalidOperationException because we've already set
+            // the return status code.  Need to investigate whether I've configured something wrong, or if the expected 
+            // behaviour for middleware is to not execute the next item if it handles the request
             await _next.Invoke(httpContext);
         }
 
+        /// <summary>
+        /// Tasked with identifying if the incoming request pertains to WOPI.  If it does, the relevant handler will be invoked
+        /// to deal with it, otherwise we will just transparently ignore it
+        /// </summary>
+        /// <param name="httpContext">The context associated with the request</param>
+        /// <returns>true if it was identified and handled, else false</returns>
         private async Task<bool> ProcessRequest(HttpContext httpContext)
         {
             const bool THIS_IS_A_WOPI_REQUEST = true;
             const bool THIS_IS_NOT_A_WOPI_REQUEST = false;
+
+            var cancellationToken = httpContext.RequestAborted;
+
+            cancellationToken.ThrowIfCancellationRequested();
 
             var wopiRequestFactory = httpContext.RequestServices.GetRequiredService<IWopiRequestFactory>();
 
@@ -36,17 +56,13 @@ namespace FutureNHS.WOPIHost
 
             if (wopiRequest.IsEmpty) return THIS_IS_NOT_A_WOPI_REQUEST; 
 
-            var cancellationToken = httpContext.RequestAborted;
-
             var wopiDiscoveryDocumentFactory = httpContext.RequestServices.GetRequiredService<IWopiDiscoveryDocumentFactory>();
 
             var wopiDiscoveryDocument = await wopiDiscoveryDocumentFactory.CreateDocumentAsync(cancellationToken);
 
-            if (wopiDiscoveryDocument.IsProofInvalid(httpContext.Request))
-            {
-                // TODO - Write appropriate response as request is invalid but pertains to a WOPI call
-                return THIS_IS_A_WOPI_REQUEST; 
-            }
+            if (wopiDiscoveryDocument.IsEmpty) throw new ApplicationException("This is a WOPI request but the WOPI discovery document is temporarily unavilable/inaccessible and so the request cannot be processed");
+
+            if (wopiDiscoveryDocument.IsProofInvalid(httpContext.Request)) throw new ApplicationException("This is a WOPI request but the proof that has been provided is considered invalid for this host to process");
 
             await wopiRequest.HandleAsync(httpContext, cancellationToken);
 
