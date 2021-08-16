@@ -32,8 +32,6 @@ namespace FutureNHS.WOPIHost.Handlers
 
             cancellationToken.ThrowIfCancellationRequested();
 
-            if (IsUnableToValidateAccessToken()) throw new ExpiredAccessTokenException("The access token has expired");
-
             return HandleAsyncImpl(context, cancellationToken);
         }
 
@@ -44,8 +42,10 @@ namespace FutureNHS.WOPIHost.Handlers
         /// At the moment we have a fake guid being passed around but this need to be implemented properly for production
         /// </summary>
         /// <returns></returns>
-        internal virtual bool IsUnableToValidateAccessToken() => IsEmpty;
-
+        internal virtual bool IsUnableToValidateAccessToken() =>
+            IsEmpty ||
+            0 == string.Compare(AccessToken, "<invalid-access-token>", StringComparison.OrdinalIgnoreCase);  // TODO - Temporary to support unit tests
+            
         private sealed class EmptyWopiRequest : WopiRequest
         {
             internal EmptyWopiRequest() { }

@@ -46,11 +46,12 @@ namespace FutureNHS.WOPIHost
 
         private WopiDiscoveryDocument() { }
 
-        private WopiDiscoveryDocument(Uri sourceEndpoint, XDocument xml, ILogger logger) 
+        private WopiDiscoveryDocument(Uri sourceEndpoint, XDocument xml, ILogger logger = default) 
         { 
             _sourceEndpoint = sourceEndpoint ?? throw new ArgumentNullException(nameof(sourceEndpoint));
             _xml = xml                       ?? throw new ArgumentNullException(nameof(xml));
-            _logger = logger                 ?? throw new ArgumentNullException(nameof(logger));
+
+            _logger = logger;
 
             // Extract the proof keys from the discovery document, noting there may be two to consider in the event of a key
             // rotation
@@ -111,7 +112,9 @@ namespace FutureNHS.WOPIHost
 
                 if (IsXmlDocumentSupported(xml)) return new WopiDiscoveryDocument(sourceEndpoint, xml, logger);
             }
-            catch (HttpRequestException ex) { logger.LogError(ex, "Failed to connect to the WOPI Client to download the discovery document"); }
+            catch (HttpRequestException ex) { 
+                logger?.LogError(ex, "Failed to connect to the WOPI Client to download the discovery document"); 
+            }
 
             return Empty;
         }

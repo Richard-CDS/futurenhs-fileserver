@@ -1,6 +1,7 @@
 ﻿using FutureNHS.WOPIHost.Configuration;
 using FutureNHS.WOPIHost.Handlers;
 using Microsoft.AspNetCore.Http;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using System;
 using System.Linq;
@@ -16,10 +17,13 @@ namespace FutureNHS.WOPIHost
         : IWopiRequestFactory
     {
         private readonly Features _features;
+        private readonly ILogger<WopiRequestFactory> _logger;
 
-        public WopiRequestFactory(IOptionsSnapshot<Features> features)
+        public WopiRequestFactory(IOptionsSnapshot<Features> features, ILogger<WopiRequestFactory> logger = default)
         {
             _features = features?.Value ?? throw new ArgumentNullException(nameof(features.Value));
+
+            _logger = logger;
         }
 
         WopiRequest IWopiRequestFactory.CreateRequest(HttpRequest httpRequest)
@@ -32,7 +36,7 @@ namespace FutureNHS.WOPIHost
             {
                 var accessToken = httpRequest.Query["access_token"].FirstOrDefault();
 
-                if (string.IsNullOrWhiteSpace(accessToken)) return WopiRequest.EMPTY;
+                if (string.IsNullOrWhiteSpace(accessToken)) return WopiRequest.EMPTY; // TODO - Might be better to be more specific with a WopiRequest.MissingAccessToken response?
 
                 WopiRequest wopiRequest;
 
@@ -46,7 +50,7 @@ namespace FutureNHS.WOPIHost
                 }
                 else return WopiRequest.EMPTY;
 
-                if (wopiRequest.IsUnableToValidateAccessToken()) return WopiRequest.EMPTY;
+                if (wopiRequest.IsUnableToValidateAccessToken()) return WopiRequest.EMPTY; // TODO - Might be better to be more specific with a WopiRequest.InvalidAccessToken response?
 
                 return wopiRequest;
             }
