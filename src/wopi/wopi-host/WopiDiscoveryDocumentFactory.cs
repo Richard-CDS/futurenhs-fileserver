@@ -1,9 +1,6 @@
-﻿using FutureNHS.WOPIHost.Configuration;
-using Microsoft.Extensions.Caching.Memory;
+﻿using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Options;
 using System;
-using System.Net.Http;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -29,15 +26,14 @@ namespace FutureNHS.WOPIHost
     {
         private readonly ILogger<WopiDiscoveryDocumentFactory> _logger;
         private readonly IMemoryCache _memoryCache;
-        private readonly IHttpClientFactory _httpClientFactory;
-        private readonly WopiConfiguration _wopiConfiguration;
+        private readonly IWopiDiscoveryDocumentRepository _wopiDiscoveryDocumentRepository;
 
-        public WopiDiscoveryDocumentFactory(IMemoryCache memoryCache, IHttpClientFactory httpClientFactory, IOptionsSnapshot<WopiConfiguration> wopiConfiguration, ILogger<WopiDiscoveryDocumentFactory> logger)
+        public WopiDiscoveryDocumentFactory(IMemoryCache memoryCache, IWopiDiscoveryDocumentRepository wopiDiscoveryDocumentRepository, ILogger<WopiDiscoveryDocumentFactory> logger)
         {
-            _logger = logger                              ?? throw new ArgumentNullException(nameof(logger));
-            _memoryCache = memoryCache                    ?? throw new ArgumentNullException(nameof(memoryCache));
-            _httpClientFactory = httpClientFactory        ?? throw new ArgumentNullException(nameof(httpClientFactory));
-            _wopiConfiguration = wopiConfiguration?.Value ?? throw new ArgumentNullException(nameof(wopiConfiguration));
+            _logger = logger;
+            
+            _memoryCache = memoryCache                                          ?? throw new ArgumentNullException(nameof(memoryCache));
+            _wopiDiscoveryDocumentRepository = wopiDiscoveryDocumentRepository  ?? throw new ArgumentNullException(nameof(wopiDiscoveryDocumentRepository));
         }
 
         async Task<IWopiDiscoveryDocument> IWopiDiscoveryDocumentFactory.CreateDocumentAsync(CancellationToken cancellationToken)
@@ -48,26 +44,20 @@ namespace FutureNHS.WOPIHost
 
             if (wopiDiscoveryDocument is null || wopiDiscoveryDocument.IsTainted)
             {
-                var clientDiscoveryDocumentEndpoint = _wopiConfiguration.ClientDiscoveryDocumentEndpoint;
+                _logger?.LogTrace("Determined we need to try to fetch the WOPI discovery document");
 
-                if (Uri.IsWellFormedUriString(clientDiscoveryDocumentEndpoint, UriKind.Absolute))
-                {
-                    var discoveryDocumentUrl = new Uri(clientDiscoveryDocumentEndpoint, UriKind.Absolute);
+                wopiDiscoveryDocument = await _wopiDiscoveryDocumentRepository.GetAsync(cancellationToken);
 
-                    var httpClient = _httpClientFactory.CreateClient("wopi-discovery-document");
+                _logger?.LogTrace("WOPI discovery document " + (wopiDiscoveryDocument.IsEmpty ? "is empty" : "successfully downloaded"));
 
-                    wopiDiscoveryDocument = await WopiDiscoveryDocument.GetAsync(httpClient, discoveryDocumentUrl, _logger, cancellationToken);
+                cancellationToken.ThrowIfCancellationRequested();
 
-                    cancellationToken.ThrowIfCancellationRequested();
+                if (wopiDiscoveryDocument.IsEmpty) wopiDiscoveryDocument = default;
 
-                    if (wopiDiscoveryDocument.IsEmpty) wopiDiscoveryDocument = default;
-
-                    _memoryCache.TrySetWopiDiscoveryDocument(wopiDiscoveryDocument);
-                }
+                _memoryCache.TrySetWopiDiscoveryDocument(wopiDiscoveryDocument);
             }
 
             return wopiDiscoveryDocument ?? WopiDiscoveryDocument.Empty;
         }
-
     }
 }

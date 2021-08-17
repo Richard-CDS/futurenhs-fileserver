@@ -13,14 +13,14 @@ namespace FutureNHS_WOPI_Host_UnitTests
     {
         [TestMethod]
         [ExpectedException(typeof(ArgumentNullException))]
-        public void ctor_ThrowsIfFeaturesOptionsConfigurationIsNull()
+        public void Ctor_ThrowsIfFeaturesOptionsConfigurationIsNull()
         {
             _ = new WopiRequestFactory(features: default);
         }
 
         [TestMethod]
         [ExpectedException(typeof(ArgumentNullException))]
-        public void ctor_ThrowsIfFeaturesConfigurationIsNull()
+        public void Ctor_ThrowsIfFeaturesConfigurationIsNull()
         {
             var snapshot = new Moq.Mock<IOptionsSnapshot<Features>>();
 

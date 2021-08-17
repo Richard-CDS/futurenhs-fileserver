@@ -57,11 +57,16 @@ namespace FutureNHS.WOPIHost
 
             services.AddScoped<RetryHandler>();
             services.AddScoped<WopiRequestFactory>();
+            services.AddScoped<WopiCryptoProofChecker>();
 
             services.AddScoped<IWopiRequestFactory>(sp => sp.GetRequiredService<WopiRequestFactory>());
+            services.AddScoped<IWopiCryptoProofChecker>(sp => sp.GetRequiredService<WopiCryptoProofChecker>());
 
             services.AddScoped<WopiDiscoveryDocumentFactory>();
             services.AddScoped<IWopiDiscoveryDocumentFactory>(sp => sp.GetRequiredService<WopiDiscoveryDocumentFactory>());
+
+            services.AddScoped<WopiDiscoveryDocumentRepository>();
+            services.AddScoped<IWopiDiscoveryDocumentRepository>(sp => sp.GetRequiredService<WopiDiscoveryDocumentRepository>());
 
             services.AddFeatureManagement().
                      AddFeatureFilter<TimeWindowFilter>().      // enable a feature between a start and end date ....... https://docs.microsoft.com/dotnet/api/microsoft.featuremanagement.featurefilters.timewindowfilter?view=azure-dotnet-preview

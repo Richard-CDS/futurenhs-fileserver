@@ -18,7 +18,7 @@ namespace FutureNHS_WOPI_Host_UnitTests
     public sealed class WopiMiddlewareTests
     {
         [TestMethod]
-        public void cTor_DoesNotThrowIfNextItemInPipelineIsNull()
+        public void CTor_DoesNotThrowIfNextItemInPipelineIsNull()
         {
             new WopiMiddleware(next: default);
         }
@@ -117,6 +117,70 @@ namespace FutureNHS_WOPI_Host_UnitTests
         }
 
         [TestMethod]
+        public async Task Invoke_ProcessRequest_DefersToWopiProofCheckerToVerifyPresentedProofs()
+        {
+            var configurationData = new Dictionary<string, string>();
+
+            var configurationBuilder = new ConfigurationBuilder();
+
+            configurationBuilder.AddInMemoryCollection(configurationData);
+
+            var configuration = configurationBuilder.Build();
+
+            var wopiRequest = new WopiRequestStub((_, __) => Task.CompletedTask);
+
+            var wopiRequestFactory = new Moq.Mock<IWopiRequestFactory>();
+
+            wopiRequestFactory.Setup(x => x.CreateRequest(Moq.It.IsAny<HttpRequest>())).Returns(wopiRequest);
+
+            var proofCheckerInvoked = false;
+
+            var wopiCryptoProofChecker = new Moq.Mock<IWopiCryptoProofChecker>();
+
+            wopiCryptoProofChecker.Setup(x => x.IsProofInvalid(Moq.It.IsAny<HttpRequest>(), Moq.It.IsAny<IWopiProofKeysProvider>())).Returns((false, false)).Callback(() => { proofCheckerInvoked = true; });
+
+            var wopiDiscoveryDocumentRepository = new Moq.Mock<IWopiDiscoveryDocumentRepository>();
+
+            var services = new ServiceCollection();
+
+            services.AddMemoryCache();
+            services.AddHttpClient();
+
+            services.Configure<Features>(configuration.GetSection("FeatureManagement"));
+
+            services.AddScoped(sp => wopiDiscoveryDocumentRepository.Object);
+            services.AddScoped(sp => wopiRequestFactory.Object);
+            services.AddScoped(sp => wopiCryptoProofChecker.Object);
+
+            services.AddScoped<WopiDiscoveryDocumentFactory>();
+            services.AddScoped<IWopiDiscoveryDocumentFactory>(sp => sp.GetRequiredService<WopiDiscoveryDocumentFactory>());
+
+            var serviceProvider = services.BuildServiceProvider();
+
+            var memoryCache = serviceProvider.GetRequiredService<IMemoryCache>();
+
+            var cachedWopiDiscoveryDocument = new Moq.Mock<IWopiDiscoveryDocument>();
+
+            cachedWopiDiscoveryDocument.SetupGet(x => x.IsTainted).Returns(false);
+
+            memoryCache.Set(ExtensionMethods.WOPI_DISCOVERY_DOCUMENT_CACHE_KEY, cachedWopiDiscoveryDocument.Object);
+
+            var httpContext = new DefaultHttpContext() { RequestServices = serviceProvider };
+
+            var httpRequest = httpContext.Request;
+
+            httpRequest.Method = HttpMethods.Get;
+            httpRequest.Path = "/wopi/files/fileidgoeshere";
+            httpRequest.QueryString = new QueryString("?access_token=tokengoeshere");
+
+            var wopiMiddleware = new WopiMiddleware(default);
+
+            await wopiMiddleware.Invoke(httpContext);
+
+            Assert.IsTrue(proofCheckerInvoked, "Expected the wopi proof checker to have been deferred to such that it could validate the proof presented in the request");
+        }
+
+        [TestMethod]
         public async Task Invoke_ProcessRequest_TransparentlyIgnoresNoneWopiRequests()
         {
             var configurationData = new Dictionary<string, string>();
@@ -162,6 +226,12 @@ namespace FutureNHS_WOPI_Host_UnitTests
 
             wopiRequestFactory.Setup(x => x.CreateRequest(Moq.It.IsAny<HttpRequest>())).Returns(wopiRequest);
 
+            var wopiCryptoProofChecker = new Moq.Mock<IWopiCryptoProofChecker>();
+
+            wopiCryptoProofChecker.Setup(x => x.IsProofInvalid(Moq.It.IsAny<HttpRequest>(), Moq.It.IsAny<IWopiProofKeysProvider>())).Returns((false, false));
+
+            var wopiDiscoveryDocumentRepository = new Moq.Mock<IWopiDiscoveryDocumentRepository>();
+
             var services = new ServiceCollection();
 
             services.AddMemoryCache();
@@ -169,7 +239,9 @@ namespace FutureNHS_WOPI_Host_UnitTests
 
             services.Configure<Features>(configuration.GetSection("FeatureManagement"));
 
-            services.AddScoped<IWopiRequestFactory>(sp => wopiRequestFactory.Object);
+            services.AddScoped(sp => wopiDiscoveryDocumentRepository.Object);
+            services.AddScoped(sp => wopiRequestFactory.Object);
+            services.AddScoped(sp => wopiCryptoProofChecker.Object);
 
             services.AddScoped<WopiDiscoveryDocumentFactory>();
             services.AddScoped<IWopiDiscoveryDocumentFactory>(sp => sp.GetRequiredService<WopiDiscoveryDocumentFactory>());
@@ -181,8 +253,6 @@ namespace FutureNHS_WOPI_Host_UnitTests
             var cachedWopiDiscoveryDocument = new Moq.Mock<IWopiDiscoveryDocument>();
 
             cachedWopiDiscoveryDocument.SetupGet(x => x.IsTainted).Returns(false);
-
-            cachedWopiDiscoveryDocument.Setup(x => x.IsProofInvalid(Moq.It.IsAny<HttpRequest>())).Returns(false);
 
             memoryCache.Set(ExtensionMethods.WOPI_DISCOVERY_DOCUMENT_CACHE_KEY, cachedWopiDiscoveryDocument.Object);
 
@@ -213,6 +283,12 @@ namespace FutureNHS_WOPI_Host_UnitTests
 
             var configuration = configurationBuilder.Build();
 
+            var wopiCryptoProofChecker = new Moq.Mock<IWopiCryptoProofChecker>();
+
+            wopiCryptoProofChecker.Setup(x => x.IsProofInvalid(Moq.It.IsAny<HttpRequest>(), Moq.It.IsAny<IWopiProofKeysProvider>())).Returns((true, false));
+
+            var wopiDiscoveryDocumentRepository = new Moq.Mock<IWopiDiscoveryDocumentRepository>();
+
             var services = new ServiceCollection();
 
             services.AddMemoryCache();
@@ -226,6 +302,9 @@ namespace FutureNHS_WOPI_Host_UnitTests
             services.AddScoped<WopiDiscoveryDocumentFactory>();
             services.AddScoped<IWopiDiscoveryDocumentFactory>(sp => sp.GetRequiredService<WopiDiscoveryDocumentFactory>());
 
+            services.AddScoped(sp => wopiCryptoProofChecker.Object);
+            services.AddScoped(sp => wopiDiscoveryDocumentRepository.Object);
+
             var serviceProvider = services.BuildServiceProvider();
 
             var memoryCache = serviceProvider.GetRequiredService<IMemoryCache>();
@@ -234,8 +313,6 @@ namespace FutureNHS_WOPI_Host_UnitTests
 
             cachedWopiDiscoveryDocument.SetupGet(x => x.IsTainted).Returns(false);
 
-            cachedWopiDiscoveryDocument.Setup(x => x.IsProofInvalid(Moq.It.IsAny<HttpRequest>())).Returns(true);
-
             memoryCache.Set(ExtensionMethods.WOPI_DISCOVERY_DOCUMENT_CACHE_KEY, cachedWopiDiscoveryDocument.Object);
 
             var httpContext = new DefaultHttpContext() { RequestServices = serviceProvider };
@@ -243,7 +320,7 @@ namespace FutureNHS_WOPI_Host_UnitTests
             var httpRequest = httpContext.Request;
 
             httpRequest.Method = HttpMethods.Get;
-            httpRequest.Path = "/wopi/files/fileidgoeshere";
+            httpRequest.Path = "/wopi/files/fileidgoeshere/contents";
             httpRequest.QueryString = new QueryString("?access_token=tokengoeshere");
 
             var wopiMiddleware = new WopiMiddleware(default);

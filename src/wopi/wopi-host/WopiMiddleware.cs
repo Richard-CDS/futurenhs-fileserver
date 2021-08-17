@@ -62,7 +62,13 @@ namespace FutureNHS.WOPIHost
 
             if (wopiDiscoveryDocument.IsEmpty) throw new ApplicationException("This is a WOPI request but the WOPI discovery document is temporarily unavilable/inaccessible and so the request cannot be processed");
 
-            if (wopiDiscoveryDocument.IsProofInvalid(httpContext.Request)) throw new ApplicationException("This is a WOPI request but the proof that has been provided is considered invalid for this host to process");
+            var wopiCryptoProofChecker = httpContext.RequestServices.GetRequiredService<IWopiCryptoProofChecker>();
+
+            var (isInvalid, refetchProofKeys) = wopiCryptoProofChecker.IsProofInvalid(httpContext.Request, wopiDiscoveryDocument);
+
+            if (refetchProofKeys) wopiDiscoveryDocument.IsTainted = true;
+
+            if (isInvalid) throw new ApplicationException("This is a WOPI request but the proof that has been provided is considered invalid for this host to process");
 
             await wopiRequest.HandleAsync(httpContext, cancellationToken);
 

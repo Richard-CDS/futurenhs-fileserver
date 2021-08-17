@@ -29,37 +29,13 @@ namespace FutureNHS_WOPI_Host_UnitTests
             
             var memoryCache = new Moq.Mock<IMemoryCache>().Object;
 
-            var wopiConfiguration = new WopiConfiguration();
+            var wopiDiscoveryDocumentRepository = new Moq.Mock<IWopiDiscoveryDocumentRepository>().Object;
 
-            var wopiConfigurationOptionsSnapshot = new Moq.Mock<IOptionsSnapshot<WopiConfiguration>>();
-
-            wopiConfigurationOptionsSnapshot.SetupGet(x => x.Value).Returns(wopiConfiguration);
-
-            var httpClientFactory = new Moq.Mock<IHttpClientFactory>();
-
-            IWopiDiscoveryDocumentFactory wopiDiscoveryDocumentFactory = new WopiDiscoveryDocumentFactory(memoryCache, httpClientFactory.Object, wopiConfigurationOptionsSnapshot.Object, logger);
+            IWopiDiscoveryDocumentFactory wopiDiscoveryDocumentFactory = new WopiDiscoveryDocumentFactory(memoryCache, wopiDiscoveryDocumentRepository, logger);
 
             _ = await wopiDiscoveryDocumentFactory.CreateDocumentAsync(cts.Token);
         }
 
-        [TestMethod]
-        [ExpectedException(typeof(ArgumentNullException))]
-        public async Task CreateDocumentAsync_ThrowsWhenConfigurationIsMissing()
-        {
-            var cancellationToken = new CancellationToken();
-
-            var logger = new Moq.Mock<ILogger<WopiDiscoveryDocumentFactory>>().Object;
-
-            var memoryCache = new Moq.Mock<IMemoryCache>().Object;
-
-            var wopiConfigurationOptionsSnapshot = new Moq.Mock<IOptionsSnapshot<WopiConfiguration>>();
-
-            var httpClientFactory = new Moq.Mock<IHttpClientFactory>();
-
-            IWopiDiscoveryDocumentFactory wopiDiscoveryDocumentFactory = new WopiDiscoveryDocumentFactory(memoryCache, httpClientFactory.Object, wopiConfigurationOptionsSnapshot.Object, logger);
-
-            _ = await wopiDiscoveryDocumentFactory.CreateDocumentAsync(cancellationToken);
-        }
 
 
 
@@ -84,15 +60,9 @@ namespace FutureNHS_WOPI_Host_UnitTests
 
             memoryCache.Set(ExtensionMethods.WOPI_DISCOVERY_DOCUMENT_CACHE_KEY, cachedWopiDiscoveryDocument.Object);
 
-            var wopiConfiguration = new WopiConfiguration();
+            var wopiDiscoveryDocumentRepository = new Moq.Mock<IWopiDiscoveryDocumentRepository>().Object;
 
-            var wopiConfigurationOptionsSnapshot = new Moq.Mock<IOptionsSnapshot<WopiConfiguration>>();
-
-            wopiConfigurationOptionsSnapshot.SetupGet(x => x.Value).Returns(wopiConfiguration);
-
-            var httpClientFactory = new Moq.Mock<IHttpClientFactory>().Object;
-
-            IWopiDiscoveryDocumentFactory wopiDiscoveryDocumentFactory = new WopiDiscoveryDocumentFactory(memoryCache, httpClientFactory, wopiConfigurationOptionsSnapshot.Object, logger);
+            IWopiDiscoveryDocumentFactory wopiDiscoveryDocumentFactory = new WopiDiscoveryDocumentFactory(memoryCache, wopiDiscoveryDocumentRepository, logger);
 
             var wopiDiscoveryDocument = await wopiDiscoveryDocumentFactory.CreateDocumentAsync(cancellationToken);
 
@@ -118,25 +88,25 @@ namespace FutureNHS_WOPI_Host_UnitTests
 
             var memoryCache = serviceProvider.GetRequiredService<IMemoryCache>();
 
-            memoryCache.Set(ExtensionMethods.WOPI_DISCOVERY_DOCUMENT_CACHE_KEY, taintedWopiDiscoveryDocument);
+            memoryCache.Set(ExtensionMethods.WOPI_DISCOVERY_DOCUMENT_CACHE_KEY, taintedWopiDiscoveryDocument.Object);
 
-            var wopiConfiguration = new WopiConfiguration();
+            var untaintedWopiDiscoveryDocument = new Moq.Mock<IWopiDiscoveryDocument>().Object;
 
-            var wopiConfigurationOptionsSnapshot = new Moq.Mock<IOptionsSnapshot<WopiConfiguration>>();
+            var wopiDiscoveryDocumentRepository = new Moq.Mock<IWopiDiscoveryDocumentRepository>();
 
-            wopiConfigurationOptionsSnapshot.SetupGet(x => x.Value).Returns(wopiConfiguration);
+            wopiDiscoveryDocumentRepository.Setup(x => x.GetAsync(Moq.It.IsAny<CancellationToken>())).Returns(Task.FromResult(untaintedWopiDiscoveryDocument));
 
-            var httpClientFactory = new Moq.Mock<IHttpClientFactory>();
-
-            IWopiDiscoveryDocumentFactory wopiDiscoveryDocumentFactory = new WopiDiscoveryDocumentFactory(memoryCache, httpClientFactory.Object, wopiConfigurationOptionsSnapshot.Object, logger);
+            IWopiDiscoveryDocumentFactory wopiDiscoveryDocumentFactory = new WopiDiscoveryDocumentFactory(memoryCache, wopiDiscoveryDocumentRepository.Object, logger);
 
             var wopiDiscoveryDocument = await wopiDiscoveryDocumentFactory.CreateDocumentAsync(cancellationToken);
 
             Assert.AreNotSame(taintedWopiDiscoveryDocument, wopiDiscoveryDocument, "Expected the tainted document to have been discarded and a new one generated");
+
+            Assert.AreSame(untaintedWopiDiscoveryDocument, wopiDiscoveryDocument, "Expected the untainted document to have been returned by the repository");
         }
 
         [TestMethod]
-        public async Task CreateDocumentAsync_ReturnsEmptyDocumentWhenDiscoveryEndpointIsNotKnown()
+        public async Task CreateDocumentAsync_DefersToDiscoveryDocumentRepositoryToGetNewDocument()
         {
             var cancellationToken = new CancellationToken();
 
@@ -150,49 +120,21 @@ namespace FutureNHS_WOPI_Host_UnitTests
 
             var memoryCache = serviceProvider.GetRequiredService<IMemoryCache>();
 
-            var wopiConfiguration = new WopiConfiguration() { ClientDiscoveryDocumentEndpoint = default };
+            var newWopiDiscoveryDocument = new Moq.Mock<IWopiDiscoveryDocument>().Object;
 
-            var wopiConfigurationOptionsSnapshot = new Moq.Mock<IOptionsSnapshot<WopiConfiguration>>();
+            var discoveryDocumentRepositoryInvoked = false;
 
-            wopiConfigurationOptionsSnapshot.SetupGet(x => x.Value).Returns(wopiConfiguration);
+            var wopiDiscoveryDocumentRepository = new Moq.Mock<IWopiDiscoveryDocumentRepository>();
 
-            var httpClientFactory = new Moq.Mock<IHttpClientFactory>();
+            wopiDiscoveryDocumentRepository.Setup(x => x.GetAsync(Moq.It.IsAny<CancellationToken>())).Returns(Task.FromResult(newWopiDiscoveryDocument)).Callback(() => { discoveryDocumentRepositoryInvoked = true; });
 
-            IWopiDiscoveryDocumentFactory wopiDiscoveryDocumentFactory = new WopiDiscoveryDocumentFactory(memoryCache, httpClientFactory.Object, wopiConfigurationOptionsSnapshot.Object, logger);
-
-            var wopiDiscoveryDocument = await wopiDiscoveryDocumentFactory.CreateDocumentAsync(cancellationToken);
-
-            Assert.IsTrue(wopiDiscoveryDocument.IsEmpty, "Expected an empty document to be returned when the discovery endpoint in not known");
-        }
-
-        [TestMethod]
-        public async Task CreateDocumentAsync_ReturnsEmptyDocumentWhenDiscoveryEndpointIsNotAnAbsoluteUrl()
-        {
-            var cancellationToken = new CancellationToken();
-
-            var logger = new Moq.Mock<ILogger<WopiDiscoveryDocumentFactory>>().Object;
-
-            var services = new ServiceCollection();
-
-            services.AddMemoryCache();
-
-            var serviceProvider = services.BuildServiceProvider();
-
-            var memoryCache = serviceProvider.GetRequiredService<IMemoryCache>();
-
-            var wopiConfiguration = new WopiConfiguration() { ClientDiscoveryDocumentEndpoint = "relative/url" };
-
-            var wopiConfigurationOptionsSnapshot = new Moq.Mock<IOptionsSnapshot<WopiConfiguration>>();
-
-            wopiConfigurationOptionsSnapshot.SetupGet(x => x.Value).Returns(wopiConfiguration);
-
-            var httpClientFactory = new Moq.Mock<IHttpClientFactory>();
-
-            IWopiDiscoveryDocumentFactory wopiDiscoveryDocumentFactory = new WopiDiscoveryDocumentFactory(memoryCache, httpClientFactory.Object, wopiConfigurationOptionsSnapshot.Object, logger);
+            IWopiDiscoveryDocumentFactory wopiDiscoveryDocumentFactory = new WopiDiscoveryDocumentFactory(memoryCache, wopiDiscoveryDocumentRepository.Object, logger);
 
             var wopiDiscoveryDocument = await wopiDiscoveryDocumentFactory.CreateDocumentAsync(cancellationToken);
 
-            Assert.IsTrue(wopiDiscoveryDocument.IsEmpty, "Expected an empty document to be returned when the discovery endpoint in not an absolute url");
+            Assert.IsTrue(discoveryDocumentRepositoryInvoked, "Expected the wopi discovery document repository to have been asked to provide a new document");
+
+            Assert.AreSame(newWopiDiscoveryDocument, wopiDiscoveryDocument, "Expected the tainted document to have been discarded and a new one generated");
         }
 
         [TestMethod]
@@ -231,7 +173,13 @@ namespace FutureNHS_WOPI_Host_UnitTests
 
             httpClientFactory.Setup(x => x.CreateClient("wopi-discovery-document")).Returns(httpClient);
 
-            IWopiDiscoveryDocumentFactory wopiDiscoveryDocumentFactory = new WopiDiscoveryDocumentFactory(memoryCache, httpClientFactory.Object, wopiConfigurationOptionsSnapshot.Object, logger);
+            var newWopiDiscoveryDocument = new Moq.Mock<IWopiDiscoveryDocument>().Object;
+
+            var wopiDiscoveryDocumentRepository = new Moq.Mock<IWopiDiscoveryDocumentRepository>();
+
+            wopiDiscoveryDocumentRepository.Setup(x => x.GetAsync(Moq.It.IsAny<CancellationToken>())).Returns(Task.FromResult(newWopiDiscoveryDocument));
+
+            IWopiDiscoveryDocumentFactory wopiDiscoveryDocumentFactory = new WopiDiscoveryDocumentFactory(memoryCache, wopiDiscoveryDocumentRepository.Object, logger);
 
             var wopiDiscoveryDocument = await wopiDiscoveryDocumentFactory.CreateDocumentAsync(cancellationToken);
 
