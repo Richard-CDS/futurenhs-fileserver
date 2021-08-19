@@ -58,6 +58,8 @@ namespace FutureNHS_WOPI_Host_UnitTests
             httpRequest.Path = "/wopi/files/fileidgoeshere";
             httpRequest.QueryString = new QueryString("?access_token=<valid-access-token>");
 
+            httpRequest.Headers["X-WOPI-ItemVersion"] = "file-version";
+
             var wopiRequest = wopiRequestFactory.CreateRequest(request: httpContext.Request);
 
             await wopiRequest.HandleAsync(httpContext, cts.Token);

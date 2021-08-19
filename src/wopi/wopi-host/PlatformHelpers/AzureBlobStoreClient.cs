@@ -14,7 +14,7 @@ namespace FutureNHS.WOPIHost.PlatformHelpers
 {
     public interface IAzureBlobStoreClient
     {
-        Task<BlobDownloadDetails> FetchBlobAndWriteToStream(string containerName, string blobName, Stream streamToWriteTo, CancellationToken cancellationToken);
+        Task<BlobDownloadDetails> FetchBlobAndWriteToStream(string containerName, string blobName, string blobVersion, Stream streamToWriteTo, CancellationToken cancellationToken);
     }
 
     /// <summary>
@@ -50,13 +50,14 @@ namespace FutureNHS.WOPIHost.PlatformHelpers
 
         private static bool IsSuccessStatusCode(int statusCode) => statusCode >= 200 && statusCode <= 299;
 
-        async Task<BlobDownloadDetails> IAzureBlobStoreClient.FetchBlobAndWriteToStream(string containerName, string blobName, Stream streamToWriteTo, CancellationToken cancellationToken)
+        async Task<BlobDownloadDetails> IAzureBlobStoreClient.FetchBlobAndWriteToStream(string containerName, string blobName, string blobVersion, Stream streamToWriteTo, CancellationToken cancellationToken)
         {
             // https://docs.microsoft.com/en-us/azure/storage/common/storage-auth-aad-msi
             // https://docs.microsoft.com/en-gb/dotnet/api/overview/azure/identity-readme
 
             if (string.IsNullOrWhiteSpace(containerName)) throw new ArgumentNullException(nameof(containerName));
             if (string.IsNullOrWhiteSpace(blobName)) throw new ArgumentNullException(nameof(blobName));
+            if (string.IsNullOrWhiteSpace(blobVersion)) throw new ArgumentNullException(nameof(blobVersion));
 
             if (streamToWriteTo is null) throw new ArgumentNullException(nameof(streamToWriteTo));
 
@@ -79,15 +80,17 @@ namespace FutureNHS.WOPIHost.PlatformHelpers
             blobClientOptions.Diagnostics.IsLoggingEnabled = true;
             blobClientOptions.Diagnostics.IsTelemetryEnabled = true;
 
+            var blobRequestConditions = new BlobRequestConditions() { };
+
             var blobServiceClient = new BlobServiceClient(_primaryServiceUrl, managedIdentityCredential, blobClientOptions);
 
             var containerClient = blobServiceClient.GetBlobContainerClient(containerName);
 
-            var blobClient = containerClient.GetBlobClient(blobName);
+            var blobClient = containerClient.GetBlobClient(blobName).WithVersion(blobVersion);
 
             try
             {
-                var result = await blobClient.DownloadStreamingAsync(cancellationToken: cancellationToken);
+                var result = await blobClient.DownloadStreamingAsync(conditions: blobRequestConditions, cancellationToken: cancellationToken);
 
                 var response = result.GetRawResponse();
 

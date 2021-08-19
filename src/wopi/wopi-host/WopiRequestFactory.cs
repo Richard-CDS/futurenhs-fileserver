@@ -44,7 +44,7 @@ namespace FutureNHS.WOPIHost
 
                 if (path.StartsWithSegments("/wopi/files", StringComparison.OrdinalIgnoreCase))
                 {
-                    wopiRequest = IdentifyFileRequest(httpRequest.Method, path, accessToken, _features);
+                    wopiRequest = IdentifyFileRequest(httpRequest, path, accessToken, _features);
                 }
                 else if (path.StartsWithSegments("/wopi/folders", StringComparison.OrdinalIgnoreCase))
                 {
@@ -60,30 +60,40 @@ namespace FutureNHS.WOPIHost
             return WopiRequest.EMPTY;
         }
 
-        private static WopiRequest IdentifyFileRequest(string method, PathString path, string accessToken, Features features)
+        private static WopiRequest IdentifyFileRequest(HttpRequest httpRequest, PathString path, string accessToken, Features features)
         {
-            var fileId = path.Value.Substring("/wopi/files/".Length)?.Trim();
+            var fileName = path.Value.Substring("/wopi/files/".Length)?.Trim();
 
-            if (string.IsNullOrWhiteSpace(fileId)) return WopiRequest.EMPTY;
+            if (string.IsNullOrWhiteSpace(fileName)) return WopiRequest.EMPTY;
 
-            if (fileId.EndsWith("/contents"))
+            var method = httpRequest.Method;
+
+            // NB - Collabora have not implemented support for the X-WOPI-ItemVersion header and so the Version field set in the 
+            //      CheckFileInfo response does not flow through to those endpoints where it is optional - eg GetFile.
+            //      This unfortunately means we have to do some crazy workaround using the fileId, and thus use that to derive 
+            //      the relevant metadata needed for us to operate correctly.  Hopefully this will prove to be just a temporary
+            //      workaround
+
+            var version = "1.0";
+
+            if (fileName.EndsWith("/contents"))
             {
-                fileId = fileId.Substring(0, fileId.Length - "/contents".Length).Trim();
+                fileName = fileName.Substring(0, fileName.Length - "/contents".Length).Trim();
 
                 if (0 == string.Compare("GET", method, StringComparison.OrdinalIgnoreCase))
                 {
-                    return GetFileWopiRequest.With(fileId, accessToken);
+                    return GetFileWopiRequest.With(fileName, version, accessToken);
                 }
                 else if (0 == string.Compare("POST", method, StringComparison.OrdinalIgnoreCase))
                 {
-                    return PostFileWopiRequest.With(fileId, accessToken); ;
+                    return PostFileWopiRequest.With(fileName, accessToken); ;
                 }
             }
             else
             {
                 if (0 == string.Compare("GET", method, StringComparison.OrdinalIgnoreCase))
                 {
-                    return CheckFileInfoWopiRequest.With(fileId, accessToken, features);
+                    return CheckFileInfoWopiRequest.With(fileName, version, accessToken, features);
                 }
             }
 

@@ -330,6 +330,8 @@ namespace FutureNHS_WOPI_Host_UnitTests
             httpRequest.Path = "/wopi/files/fileidgoeshere/contents";
             httpRequest.QueryString = new QueryString("?access_token=tokengoeshere");
 
+            httpRequest.Headers["X-WOPI-ItemVersion"] = "file-version";
+
             var wopiMiddleware = new WopiMiddleware(default);
 
             await wopiMiddleware.Invoke(httpContext);
@@ -375,6 +377,8 @@ namespace FutureNHS_WOPI_Host_UnitTests
             httpRequest.Method = HttpMethods.Get;
             httpRequest.Path = "/wopi/files/fileidgoeshere";
             httpRequest.QueryString = new QueryString("?access_token=tokengoeshere");
+
+            httpRequest.Headers["X-WOPI-ItemVersion"] = "file-version";
 
             var wopiMiddleware = new WopiMiddleware(default);
 

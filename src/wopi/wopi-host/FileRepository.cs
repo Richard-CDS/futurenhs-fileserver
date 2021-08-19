@@ -1,15 +1,9 @@
-﻿using Azure.Identity;
-using Azure.Storage.Blobs;
-using FutureNHS.WOPIHost.Configuration;
-using FutureNHS.WOPIHost.Exceptions;
+﻿using FutureNHS.WOPIHost.Configuration;
 using FutureNHS.WOPIHost.PlatformHelpers;
-using Microsoft.AspNetCore.StaticFiles;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using System;
-using System.Globalization;
 using System.IO;
-using System.Net;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -21,10 +15,11 @@ namespace FutureNHS.WOPIHost
         /// Tasked with retrieving a file located in storage and writing it into <paramref name="streamToWriteTo"/>
         /// </summary>
         /// <param name="fileName">The name of the file as used in storage</param>
+        /// <param name="fileVersion">The version of the file that the caller wishes to retrieve</param>
         /// <param name="streamToWriteTo">The stream to which the content of the file will be written in the success case/></param>
         /// <param name="cancellationToken"></param>
         /// <returns></returns>
-        Task CopyToStreamAsync(string fileName, Stream streamToWriteTo, CancellationToken cancellationToken);
+        Task WriteToStreamAsync(string fileName, string fileVersion, Stream streamToWriteTo, CancellationToken cancellationToken);
     }
 
     public sealed class FileRepository : IFileRepository
@@ -49,11 +44,23 @@ namespace FutureNHS.WOPIHost
             _containerName = containerName;
         }
 
-        async Task IFileRepository.CopyToStreamAsync(string fileName, Stream streamToWriteTo, CancellationToken cancellationToken)
+        async Task IFileRepository.WriteToStreamAsync(string fileName, string fileVersion, Stream streamToWriteTo, CancellationToken cancellationToken)
         {
             cancellationToken.ThrowIfCancellationRequested();
 
-            var result = await _azureBlobStoreClient.FetchBlobAndWriteToStream(_containerName, fileName, streamToWriteTo, cancellationToken);
+            var downloadDetails = await _azureBlobStoreClient.FetchBlobAndWriteToStream(_containerName, fileName, fileVersion, streamToWriteTo, cancellationToken);
+
+            // TODO - figure out useful information to return to the caller.  Might only be needed for file info requests but wondering 
+            //        if we should store the hash when a doc is uploaded and then x-check it before allowing user to edit/download
+
+            var contentType = downloadDetails.ContentType;
+
+            var hash = downloadDetails.ContentHash;
+
+            var etag = downloadDetails.ETag;
+
+            var versionId = downloadDetails.VersionId;
+
         }
 
 

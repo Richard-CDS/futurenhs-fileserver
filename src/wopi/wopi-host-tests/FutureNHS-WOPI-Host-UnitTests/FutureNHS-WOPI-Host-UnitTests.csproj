@@ -8,6 +8,26 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <None Remove="Excel-Spreadsheet.xlsx" />
+    <None Remove="Image-File.jpg" />
+    <None Remove="OpenDocument-Text-File.odt" />
+    <None Remove="Portable-Document-Format-File.pdf" />
+    <None Remove="PowerPoint-Presentation.pptx" />
+    <None Remove="Text-File.txt" />
+    <None Remove="Word-Document.docx" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ApplicationDefinition Include="Files\Excel-Spreadsheet.xlsx" />
+    <ApplicationDefinition Include="Files\Image-File.jpg" />
+    <ApplicationDefinition Include="Files\OpenDocument-Text-File.odt" />
+    <ApplicationDefinition Include="Files\Portable-Document-Format-File.pdf" />
+    <ApplicationDefinition Include="Files\PowerPoint-Presentation.pptx" />
+    <ApplicationDefinition Include="Files\Text-File.txt" />
+    <ApplicationDefinition Include="Files\Word-Document.docx" />
+  </ItemGroup>
+
+  <ItemGroup>
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="16.5.0" />
     <PackageReference Include="Moq" Version="4.16.1" />
     <PackageReference Include="MSTest.TestAdapter" Version="2.1.0" />
@@ -17,6 +37,34 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\wopi-host\FutureNHS-WOPI-Host.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Folder Include="FIles\" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Update="FIles\Excel-Spreadsheet.xlsx">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Update="FIles\Image-File.jpg">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Update="FIles\OpenDocument-Text-File.odt">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Update="FIles\Portable-Document-Format-File.pdf">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Update="FIles\PowerPoint-Presentation.pptx">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Update="FIles\Text-File.txt">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Update="FIles\Word-Document.docx">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
   </ItemGroup>
 
 </Project>

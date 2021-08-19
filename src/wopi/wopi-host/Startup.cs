@@ -181,7 +181,7 @@ namespace FutureNHS.WOPIHost
             sb.AppendLine($"      USE_AZURE_APP_CONFIGURATION = {Environment.GetEnvironmentVariable("USE_AZURE_APP_CONFIGURATION")}</br>");
             sb.AppendLine($"    </p>");
             sb.AppendLine($"    <p>");
-            sb.AppendLine($"      <h1>Configuration/h1></br>");
+            sb.AppendLine($"      <h1>Configuration</h1></br>");
             sb.AppendLine($"      AzurePlatform:AzureAppConfiguration:CacheExpirationIntervalInSeconds = { azureConfig.AzureAppConfiguration?.CacheExpirationIntervalInSeconds }</br>");
             sb.AppendLine($"      AzurePlatform:AzureAppConfiguration:PrimaryServiceUrl = { azureConfig.AzureAppConfiguration?.PrimaryServiceUrl }</br>");
             sb.AppendLine($"      AzurePlatform:AzureAppConfiguration:GeoRedundantServiceUrl = { azureConfig.AzureAppConfiguration?.GeoRedundantServiceUrl }</br>");
