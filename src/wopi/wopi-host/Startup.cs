@@ -159,9 +159,14 @@ namespace FutureNHS.WOPIHost
         {
             httpContext.Response.StatusCode = StatusCodes.Status200OK;
 
+            // TODO - Remove all the private information that's included at the moment to make it easier to debug
+            //        and replace with something more appropriate/informative to public consumers
+
             var sb = new StringBuilder();
 
-            var config = httpContext.RequestServices.GetRequiredService<IOptionsSnapshot<AzurePlatformConfiguration>>().Value;
+            var featuresConfig = httpContext.RequestServices.GetRequiredService<IOptionsSnapshot<Features>>().Value;
+            var wopiConfig = httpContext.RequestServices.GetRequiredService<IOptionsSnapshot<WopiConfiguration>>().Value;
+            var azureConfig = httpContext.RequestServices.GetRequiredService<IOptionsSnapshot<AzurePlatformConfiguration>>().Value;
 
             sb.AppendLine($"<!doctype html>");
             sb.AppendLine($"<html>");
@@ -177,13 +182,18 @@ namespace FutureNHS.WOPIHost
             sb.AppendLine($"    </p>");
             sb.AppendLine($"    <p>");
             sb.AppendLine($"      <h1>Configuration/h1></br>");
-            sb.AppendLine($"      AzureAppConfiguration:CacheExpirationIntervalInSeconds = { config.AzureAppConfiguration?.CacheExpirationIntervalInSeconds }</br>");
-            sb.AppendLine($"      AzureAppConfiguration:PrimaryServiceUrl = { config.AzureAppConfiguration?.PrimaryServiceUrl }</br>");
-            sb.AppendLine($"      AzureAppConfiguration:GeoRedundantServiceUrl = { config.AzureAppConfiguration?.GeoRedundantServiceUrl }</br>");
+            sb.AppendLine($"      AzurePlatform:AzureAppConfiguration:CacheExpirationIntervalInSeconds = { azureConfig.AzureAppConfiguration?.CacheExpirationIntervalInSeconds }</br>");
+            sb.AppendLine($"      AzurePlatform:AzureAppConfiguration:PrimaryServiceUrl = { azureConfig.AzureAppConfiguration?.PrimaryServiceUrl }</br>");
+            sb.AppendLine($"      AzurePlatform:AzureAppConfiguration:GeoRedundantServiceUrl = { azureConfig.AzureAppConfiguration?.GeoRedundantServiceUrl }</br>");
             sb.AppendLine($"      <br/>");
-            sb.AppendLine($"      AzureBlobStorage:PrimaryServiceUrl = { config.AzureBlobStorage?.PrimaryServiceUrl }</br>");
-            sb.AppendLine($"      AzureBlobStorage:GeoRedundantServiceUrl = { config.AzureBlobStorage?.GeoRedundantServiceUrl }</br>");
-            sb.AppendLine($"      AzureBlobStorage:ContainerName = { config.AzureBlobStorage?.ContainerName }</br>");
+            sb.AppendLine($"      AzurePlatform:AzureBlobStorage:PrimaryServiceUrl = { azureConfig.AzureBlobStorage?.PrimaryServiceUrl }</br>");
+            sb.AppendLine($"      AzurePlatform:AzureBlobStorage:GeoRedundantServiceUrl = { azureConfig.AzureBlobStorage?.GeoRedundantServiceUrl }</br>");
+            sb.AppendLine($"      AzurePlatform:AzureBlobStorage:ContainerName = { azureConfig.AzureBlobStorage?.ContainerName }</br>");
+            sb.AppendLine($"      <br/>");
+            sb.AppendLine($"      Wopi:ClientDiscoveryDocumentUrl = { wopiConfig.ClientDiscoveryDocumentUrl }</br>");
+            sb.AppendLine($"      Wopi:HostFilesUrl = { wopiConfig.HostFilesUrl }</br>");
+            sb.AppendLine($"      <br/>");
+            sb.AppendLine($"      Features:AllowFileEdit = { featuresConfig.AllowFileEdit }</br>");
             sb.AppendLine($"    </p>");
             sb.AppendLine($"  </body>");
             sb.AppendLine($"</html>");
