@@ -33,11 +33,12 @@ namespace FutureNHS.WOPIHost
         {
             cancellationToken.ThrowIfCancellationRequested();
 
-            var clientDiscoveryDocumentEndpoint = _wopiConfiguration.ClientDiscoveryDocumentEndpoint;
+            var ClientDiscoveryDocumentUrl = _wopiConfiguration.ClientDiscoveryDocumentUrl;
 
-            if (!Uri.IsWellFormedUriString(clientDiscoveryDocumentEndpoint, UriKind.Absolute)) return WopiDiscoveryDocument.Empty;
+            if (string.IsNullOrWhiteSpace(ClientDiscoveryDocumentUrl)) return WopiDiscoveryDocument.Empty;
+            if (!Uri.IsWellFormedUriString(ClientDiscoveryDocumentUrl, UriKind.Absolute)) return WopiDiscoveryDocument.Empty;
 
-            var discoveryDocumentUrl = new Uri(clientDiscoveryDocumentEndpoint, UriKind.Absolute);
+            var discoveryDocumentUrl = new Uri(ClientDiscoveryDocumentUrl, UriKind.Absolute);
 
             var httpClient = _httpClientFactory.CreateClient("wopi-discovery-document");
 
@@ -61,7 +62,11 @@ namespace FutureNHS.WOPIHost
 
                 if (!accepts.Contains(contentType, StringComparison.OrdinalIgnoreCase)) return WopiDiscoveryDocument.Empty;
 
-                using var strm = await response.Content.ReadAsStreamAsync();
+                var httpContent = response.Content;
+
+                if (httpContent is null) return WopiDiscoveryDocument.Empty;
+
+                using var strm = await httpContent.ReadAsStreamAsync();
 
                 var xml = await XDocument.LoadAsync(strm, LoadOptions.None, cancellationToken);
 

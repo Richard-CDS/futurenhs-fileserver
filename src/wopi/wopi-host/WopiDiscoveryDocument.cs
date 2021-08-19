@@ -11,24 +11,23 @@ namespace FutureNHS.WOPIHost
     {
         bool IsTainted { get; set; } 
 
-        Uri GetEndpointForFileExtension(string fileExtension, string fileAction, Uri wopiHostFileEndpointUrl);
+        Uri? GetEndpointForFileExtension(string fileExtension, string fileAction, Uri wopiHostFileEndpointUrl);
     }    
 
     internal sealed class WopiDiscoveryDocument : IWopiDiscoveryDocument
     {
         internal static readonly WopiDiscoveryDocument Empty = new WopiDiscoveryDocument();
 
-        private readonly Uri _sourceEndpoint;
-        private readonly XDocument _xml;
-        private readonly ILogger _logger;
-        private readonly FileExtensionContentTypeProvider _contentTypeProvider = new FileExtensionContentTypeProvider();
+        private readonly Uri? _sourceEndpoint;
+        private readonly XDocument? _xml;
+        private readonly ILogger? _logger;
 
-        private readonly string _publicKeyCspBlob;
-        private readonly string _oldPublicKeyCspBlob;
+        private readonly string? _publicKeyCspBlob;
+        private readonly string? _oldPublicKeyCspBlob;
 
         private WopiDiscoveryDocument() { }
 
-        internal WopiDiscoveryDocument(Uri sourceEndpoint, XDocument xml, ILogger logger = default) 
+        internal WopiDiscoveryDocument(Uri sourceEndpoint, XDocument xml, ILogger? logger = default) 
         { 
             _sourceEndpoint = sourceEndpoint ?? throw new ArgumentNullException(nameof(sourceEndpoint));
             _xml = xml                       ?? throw new ArgumentNullException(nameof(xml));
@@ -46,8 +45,8 @@ namespace FutureNHS.WOPIHost
             _oldPublicKeyCspBlob = proofKey.Attribute(XName.Get("oldvalue")).Value;
         }
 
-        string IWopiProofKeysProvider.PublicKeyCspBlob => _publicKeyCspBlob;
-        string IWopiProofKeysProvider.OldPublicKeyCspBlob => _oldPublicKeyCspBlob;
+        string? IWopiProofKeysProvider.PublicKeyCspBlob => _publicKeyCspBlob;
+        string? IWopiProofKeysProvider.OldPublicKeyCspBlob => _oldPublicKeyCspBlob;
 
         /// <summary>
         /// Responsible for validating that the schema of the discovery document returned by the WOPI client can 
@@ -83,11 +82,13 @@ namespace FutureNHS.WOPIHost
         /// </summary>
         public bool IsEmpty => ReferenceEquals(this, Empty);
 
-        Uri IWopiDiscoveryDocument.GetEndpointForFileExtension(string fileExtension, string fileAction, Uri wopiHostFileEndpointUrl)
+        Uri? IWopiDiscoveryDocument.GetEndpointForFileExtension(string fileExtension, string fileAction, Uri wopiHostFileEndpointUrl)
         {
             // https://wopi.readthedocs.io/en/latest/discovery.html
 
             if (IsEmpty) throw new WopiDiscoveryDocumentEmptyException();
+
+            Debug.Assert(_xml is object);
 
             if (string.IsNullOrWhiteSpace(fileExtension)) return default;
             if (string.IsNullOrWhiteSpace(fileAction)) return default;
@@ -97,7 +98,9 @@ namespace FutureNHS.WOPIHost
 
             if (fileExtension.StartsWith('.')) fileExtension = fileExtension.Substring(1);
 
-            _ = _contentTypeProvider.TryGetContentType("." + fileExtension, out var fileContentType);
+            var contentTypeProvider = new FileExtensionContentTypeProvider();
+
+            _ = contentTypeProvider.TryGetContentType("." + fileExtension, out var fileContentType);
 
             var rootElement = _xml.Element(XName.Get("wopi-discovery"));
 
@@ -109,7 +112,7 @@ namespace FutureNHS.WOPIHost
 
                 foreach (var actionElement in appElement.Elements("action"))
                 {
-                    if (!string.Equals(appName, fileContentType))
+                    if (!string.Equals(appName, fileContentType, StringComparison.OrdinalIgnoreCase))
                     {
                         var ext = actionElement.Attribute("ext").Value;
 

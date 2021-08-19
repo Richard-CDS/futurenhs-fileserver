@@ -22,7 +22,7 @@ namespace FutureNHS.WOPIHost.Handlers
             _isWriteAccessRequired = isWriteAccessRequired;
         }
 
-        public string AccessToken { get; }
+        public string? AccessToken { get; }
 
         internal bool IsEmpty => ReferenceEquals(this, WopiRequest.EMPTY);
 

@@ -12,7 +12,7 @@
         /// https://futurenhs.cds.co.uk/gateway/wopi/host/files/
         /// </example>
 
-        public string ClientDiscoveryDocumentEndpoint { get; set; }
+        public string? ClientDiscoveryDocumentUrl { get; set; }
 
         /// <summary>
         /// This is the absolute url for the root endpoint from which the WOPI host (the file server) implements WOPI file related
@@ -22,6 +22,6 @@
         /// https://futurenhs.cds.co.uk/gateway/wopi/client/hosting/discovery
         /// </example>
 
-        public string HostFilesEndpoint { get; set; }
+        public string? HostFilesUrl { get; set; }
     }
 }

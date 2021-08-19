@@ -1,5 +1,6 @@
 using FutureNHS.WOPIHost.Configuration;
 using FutureNHS.WOPIHost.HttpHelpers;
+using FutureNHS.WOPIHost.PlatformHelpers;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
@@ -7,6 +8,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Internal;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Microsoft.FeatureManagement;
 using Microsoft.FeatureManagement.FeatureFilters;
@@ -52,21 +54,40 @@ namespace FutureNHS.WOPIHost
 
             services.Configure<Features>(_configuration.GetSection("FeatureManagement"), binderOptions => binderOptions.BindNonPublicProperties = true);
             services.Configure<WopiConfiguration>(_configuration.GetSection("Wopi"));
+            services.Configure<AzurePlatformConfiguration>(_configuration.GetSection("AzurePlatform"));
 
             services.AddSingleton<ISystemClock>(new SystemClock());
 
             services.AddScoped<RetryHandler>();
-            services.AddScoped<WopiRequestFactory>();
-            services.AddScoped<WopiCryptoProofChecker>();
 
-            services.AddScoped<IWopiRequestFactory>(sp => sp.GetRequiredService<WopiRequestFactory>());
-            services.AddScoped<IWopiCryptoProofChecker>(sp => sp.GetRequiredService<WopiCryptoProofChecker>());
+            services.AddScoped(
+                sp => {
+                    var config = sp.GetRequiredService<IOptionsSnapshot<AzurePlatformConfiguration>>().Value.AzureBlobStorage;
+
+                    if (config is null) throw new ApplicationException("Unable to load the azure blob storage configuration");
+                    if (config.PrimaryServiceUrl is null) throw new ApplicationException("The azure blob storage primary service url is null in the files configuration section");
+                    if (config.GeoRedundantServiceUrl is null) throw new ApplicationException("The azure blob storage geo-redundant service url is null in the files configuration section");
+
+                    var logger = sp.GetRequiredService<ILogger<AzureBlobStoreClient>>();
+
+                    return new AzureBlobStoreClient(config.PrimaryServiceUrl, config.GeoRedundantServiceUrl, logger);
+                });
+            services.AddScoped<IAzureBlobStoreClient>(sp => sp.GetRequiredService<AzureBlobStoreClient>());
+
+            services.AddScoped<FileRepository>();
+            services.AddScoped<IFileRepository>(sp => sp.GetRequiredService<FileRepository>());
 
             services.AddScoped<WopiDiscoveryDocumentFactory>();
             services.AddScoped<IWopiDiscoveryDocumentFactory>(sp => sp.GetRequiredService<WopiDiscoveryDocumentFactory>());
 
             services.AddScoped<WopiDiscoveryDocumentRepository>();
             services.AddScoped<IWopiDiscoveryDocumentRepository>(sp => sp.GetRequiredService<WopiDiscoveryDocumentRepository>());
+
+            services.AddScoped<WopiRequestFactory>();
+            services.AddScoped<IWopiRequestFactory>(sp => sp.GetRequiredService<WopiRequestFactory>());
+
+            services.AddScoped<WopiCryptoProofChecker>();
+            services.AddScoped<IWopiCryptoProofChecker>(sp => sp.GetRequiredService<WopiCryptoProofChecker>());
 
             services.AddFeatureManagement().
                      AddFeatureFilter<TimeWindowFilter>().      // enable a feature between a start and end date ....... https://docs.microsoft.com/dotnet/api/microsoft.featuremanagement.featurefilters.timewindowfilter?view=azure-dotnet-preview
@@ -199,9 +220,11 @@ namespace FutureNHS.WOPIHost
 
             var wopiConfiguration = httpContext.RequestServices.GetRequiredService<IOptionsSnapshot<WopiConfiguration>>().Value;
 
-            var hostFileEndpointUrl = wopiConfiguration.HostFilesEndpoint;
+            var hostFilesUrl = wopiConfiguration.HostFilesUrl;
 
-            var wopiHostFileEndpointUrl = new Uri(Path.Combine(hostFileEndpointUrl, fileId), UriKind.Absolute);
+            if (string.IsNullOrWhiteSpace(hostFilesUrl)) return;
+
+            var wopiHostFileEndpointUrl = new Uri(Path.Combine(hostFilesUrl, fileId), UriKind.Absolute);
             
             var fileExtension = Path.GetExtension(fileId);
 

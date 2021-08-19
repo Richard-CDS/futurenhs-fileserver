@@ -16,12 +16,14 @@ namespace FutureNHS.WOPIHost
     internal sealed class WopiRequestFactory
         : IWopiRequestFactory
     {
+        private readonly IFileRepository _fileRepository;
         private readonly Features _features;
-        private readonly ILogger<WopiRequestFactory> _logger;
+        private readonly ILogger<WopiRequestFactory>? _logger;
 
-        public WopiRequestFactory(IOptionsSnapshot<Features> features, ILogger<WopiRequestFactory> logger = default)
+        public WopiRequestFactory(IFileRepository fileRepository, IOptionsSnapshot<Features> features, ILogger<WopiRequestFactory>? logger = default)
         {
-            _features = features?.Value ?? throw new ArgumentNullException(nameof(features.Value));
+            _fileRepository = fileRepository    ?? throw new ArgumentNullException(nameof(fileRepository));
+            _features = features?.Value         ?? throw new ArgumentNullException(nameof(features.Value));
 
             _logger = logger;
         }
@@ -46,7 +48,7 @@ namespace FutureNHS.WOPIHost
                 }
                 else if (path.StartsWithSegments("/wopi/folders", StringComparison.OrdinalIgnoreCase))
                 {
-                    wopiRequest = IdentifyFolderRequest(httpRequest.Method, path, accessToken);
+                    wopiRequest = IdentifyFolderRequest();
                 }
                 else return WopiRequest.EMPTY;
 
@@ -88,7 +90,7 @@ namespace FutureNHS.WOPIHost
             return WopiRequest.EMPTY;
         }
 
-        private static WopiRequest IdentifyFolderRequest(string method, PathString path, string accessToken)
+        private static WopiRequest IdentifyFolderRequest()
         {
             return WopiRequest.EMPTY;
         }

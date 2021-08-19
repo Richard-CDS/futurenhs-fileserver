@@ -41,7 +41,7 @@ namespace FutureNHS_WOPI_Host_UnitTests
 
         [TestMethod]
         [ExpectedException(typeof(ArgumentNullException))]
-        public async Task CTor_ThrowsWhenConfigurationIsMissing()
+        public void CTor_ThrowsWhenConfigurationIsMissing()
         {
             var logger = new Moq.Mock<ILogger<WopiDiscoveryDocumentRepository>>().Object;
 
@@ -103,7 +103,7 @@ namespace FutureNHS_WOPI_Host_UnitTests
 
             var sourceEndpoint = new Uri(WopiDiscoveryDocumentTests.WOPI_ROOT + "client/hosting/discovery", UriKind.Absolute);
 
-            var wopiConfiguration = new WopiConfiguration() { ClientDiscoveryDocumentEndpoint = sourceEndpoint.AbsoluteUri };
+            var wopiConfiguration = new WopiConfiguration() { ClientDiscoveryDocumentUrl = sourceEndpoint.AbsoluteUri };
 
             var wopiConfigurationOptionsSnapshot = new Moq.Mock<IOptionsSnapshot<WopiConfiguration>>();
 
@@ -150,7 +150,7 @@ namespace FutureNHS_WOPI_Host_UnitTests
 
             var sourceEndpoint = default(Uri);
 
-            var wopiConfiguration = new WopiConfiguration() { ClientDiscoveryDocumentEndpoint = sourceEndpoint?.AbsoluteUri };
+            var wopiConfiguration = new WopiConfiguration() { ClientDiscoveryDocumentUrl = sourceEndpoint?.AbsoluteUri };
 
             var wopiConfigurationOptionsSnapshot = new Moq.Mock<IOptionsSnapshot<WopiConfiguration>>();
 
@@ -184,7 +184,7 @@ namespace FutureNHS_WOPI_Host_UnitTests
 
             var sourceEndpoint = new Uri(WopiDiscoveryDocumentTests.WOPI_ROOT + "client/hosting/discovery", UriKind.Absolute);
 
-            var wopiConfiguration = new WopiConfiguration() { ClientDiscoveryDocumentEndpoint = sourceEndpoint.AbsoluteUri };
+            var wopiConfiguration = new WopiConfiguration() { ClientDiscoveryDocumentUrl = sourceEndpoint.AbsoluteUri };
 
             var wopiConfigurationOptionsSnapshot = new Moq.Mock<IOptionsSnapshot<WopiConfiguration>>();
 
@@ -216,7 +216,7 @@ namespace FutureNHS_WOPI_Host_UnitTests
 
             var sourceEndpoint = new Uri(WopiDiscoveryDocumentTests.WOPI_ROOT + "client/hosting/discovery", UriKind.Absolute);
 
-            var wopiConfiguration = new WopiConfiguration() { ClientDiscoveryDocumentEndpoint = sourceEndpoint.AbsoluteUri };
+            var wopiConfiguration = new WopiConfiguration() { ClientDiscoveryDocumentUrl = sourceEndpoint.AbsoluteUri };
 
             var wopiConfigurationOptionsSnapshot = new Moq.Mock<IOptionsSnapshot<WopiConfiguration>>();
 
@@ -248,7 +248,7 @@ namespace FutureNHS_WOPI_Host_UnitTests
 
             var sourceEndpoint = new Uri(WopiDiscoveryDocumentTests.WOPI_ROOT + "client/hosting/discovery", UriKind.Absolute);
 
-            var wopiConfiguration = new WopiConfiguration() { ClientDiscoveryDocumentEndpoint = sourceEndpoint.AbsoluteUri };
+            var wopiConfiguration = new WopiConfiguration() { ClientDiscoveryDocumentUrl = sourceEndpoint.AbsoluteUri };
 
             var wopiConfigurationOptionsSnapshot = new Moq.Mock<IOptionsSnapshot<WopiConfiguration>>();
 
@@ -282,7 +282,7 @@ namespace FutureNHS_WOPI_Host_UnitTests
 
             var sourceEndpoint = new Uri(WopiDiscoveryDocumentTests.WOPI_ROOT + "client/hosting/discovery", UriKind.Absolute);
 
-            var wopiConfiguration = new WopiConfiguration() { ClientDiscoveryDocumentEndpoint = sourceEndpoint.AbsoluteUri };
+            var wopiConfiguration = new WopiConfiguration() { ClientDiscoveryDocumentUrl = sourceEndpoint.AbsoluteUri };
 
             var wopiConfigurationOptionsSnapshot = new Moq.Mock<IOptionsSnapshot<WopiConfiguration>>();
 
@@ -317,7 +317,7 @@ namespace FutureNHS_WOPI_Host_UnitTests
 
             var sourceEndpoint = new Uri(WopiDiscoveryDocumentTests.WOPI_ROOT + "client/hosting/discovery", UriKind.Absolute);
 
-            var wopiConfiguration = new WopiConfiguration() { ClientDiscoveryDocumentEndpoint = sourceEndpoint.AbsoluteUri };
+            var wopiConfiguration = new WopiConfiguration() { ClientDiscoveryDocumentUrl = sourceEndpoint.AbsoluteUri };
 
             var wopiConfigurationOptionsSnapshot = new Moq.Mock<IOptionsSnapshot<WopiConfiguration>>();
 
@@ -347,7 +347,7 @@ namespace FutureNHS_WOPI_Host_UnitTests
 
             var sourceEndpoint = new Uri(WopiDiscoveryDocumentTests.WOPI_ROOT + WopiDiscoveryDocumentTests.WOPI_DISCOVERY_DOCUMENT_URL, UriKind.Absolute);
 
-            var wopiConfiguration = new WopiConfiguration() { ClientDiscoveryDocumentEndpoint = sourceEndpoint.AbsoluteUri };
+            var wopiConfiguration = new WopiConfiguration() { ClientDiscoveryDocumentUrl = sourceEndpoint.AbsoluteUri };
 
             var wopiConfigurationOptionsSnapshot = new Moq.Mock<IOptionsSnapshot<WopiConfiguration>>();
 

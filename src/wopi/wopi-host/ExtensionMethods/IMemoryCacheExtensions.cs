@@ -7,7 +7,7 @@ namespace FutureNHS.WOPIHost
     {
         internal const string WOPI_DISCOVERY_DOCUMENT_CACHE_KEY = "wopi.discovery.document";
 
-        public static bool TrySetWopiDiscoveryDocument(this IMemoryCache memoryCache, IWopiDiscoveryDocument wopiDiscoveryDocument)
+        public static bool TrySetWopiDiscoveryDocument(this IMemoryCache memoryCache, IWopiDiscoveryDocument? wopiDiscoveryDocument)
         {
             if (memoryCache is null) return false;
 
@@ -24,7 +24,7 @@ namespace FutureNHS.WOPIHost
             return memoryCache.TryGetValue(WOPI_DISCOVERY_DOCUMENT_CACHE_KEY, out _);
         }
 
-        public static bool TryGetWopiDiscoveryDocument(this IMemoryCache memoryCache, out IWopiDiscoveryDocument wopiDiscoveryDocument)
+        public static bool TryGetWopiDiscoveryDocument(this IMemoryCache memoryCache, out IWopiDiscoveryDocument? wopiDiscoveryDocument)
         {
             wopiDiscoveryDocument = default;
 
@@ -33,7 +33,7 @@ namespace FutureNHS.WOPIHost
             return memoryCache.TryGetValue(WOPI_DISCOVERY_DOCUMENT_CACHE_KEY, out wopiDiscoveryDocument);
         }
 
-        static bool TryRemoveWopiDiscoveryDocument(IMemoryCache memoryCache)
+        static bool TryRemoveWopiDiscoveryDocument(IMemoryCache? memoryCache)
         {
             if (memoryCache is null) return false;
 

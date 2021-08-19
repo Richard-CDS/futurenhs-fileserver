@@ -45,12 +45,14 @@ namespace FutureNHS_WOPI_Host_UnitTests
 
             var configuration = configurationBuilder.Build();
 
+
             var services = new ServiceCollection();
 
             services.Configure<Features>(configuration.GetSection("FeatureManagement"));
 
             services.AddScoped<WopiRequestFactory>();
             services.AddScoped<IWopiRequestFactory>(sp => sp.GetRequiredService<WopiRequestFactory>());
+            services.AddScoped(sp => new Moq.Mock<IFileRepository>().Object);
 
             var serviceProvider = services.BuildServiceProvider();
 
@@ -198,6 +200,8 @@ namespace FutureNHS_WOPI_Host_UnitTests
             services.AddScoped<WopiRequestFactory>();
             services.AddScoped<IWopiRequestFactory>(sp => sp.GetRequiredService<WopiRequestFactory>());
 
+            services.AddScoped(sp => new Moq.Mock<IFileRepository>().Object);
+
             var serviceProvider = services.BuildServiceProvider();
 
             var httpContext = new DefaultHttpContext() { RequestServices = serviceProvider };
@@ -289,6 +293,8 @@ namespace FutureNHS_WOPI_Host_UnitTests
 
             var wopiDiscoveryDocumentRepository = new Moq.Mock<IWopiDiscoveryDocumentRepository>();
 
+            var fileRepository = new Moq.Mock<IFileRepository>();
+
             var services = new ServiceCollection();
 
             services.AddMemoryCache();
@@ -304,6 +310,7 @@ namespace FutureNHS_WOPI_Host_UnitTests
 
             services.AddScoped(sp => wopiCryptoProofChecker.Object);
             services.AddScoped(sp => wopiDiscoveryDocumentRepository.Object);
+            services.AddScoped(sp => fileRepository.Object);
 
             var serviceProvider = services.BuildServiceProvider();
 
@@ -344,6 +351,8 @@ namespace FutureNHS_WOPI_Host_UnitTests
 
             wopiDiscoveryDocumentFactory.Setup(x => x.CreateDocumentAsync(Moq.It.IsAny<CancellationToken>())).Returns(Task.FromResult< IWopiDiscoveryDocument>(WopiDiscoveryDocument.Empty));
 
+            var fileRepository = new Moq.Mock<IFileRepository>();
+
             var services = new ServiceCollection();
 
             services.AddMemoryCache();
@@ -354,7 +363,8 @@ namespace FutureNHS_WOPI_Host_UnitTests
             services.AddScoped<WopiRequestFactory>();
             services.AddScoped<IWopiRequestFactory>(sp => sp.GetRequiredService<WopiRequestFactory>());
 
-            services.AddScoped<IWopiDiscoveryDocumentFactory>(sp => wopiDiscoveryDocumentFactory.Object);
+            services.AddScoped(sp => wopiDiscoveryDocumentFactory.Object);
+            services.AddScoped(sp => fileRepository.Object);
 
             var serviceProvider = services.BuildServiceProvider();
 

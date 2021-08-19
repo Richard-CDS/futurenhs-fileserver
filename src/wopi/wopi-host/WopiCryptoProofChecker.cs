@@ -24,8 +24,9 @@ namespace FutureNHS.WOPIHost
     public interface IWopiProofKeysProvider
     {
         bool IsEmpty { get; }
-        string PublicKeyCspBlob { get; }
-        string OldPublicKeyCspBlob { get; }
+
+        string? PublicKeyCspBlob { get; }
+        string? OldPublicKeyCspBlob { get; }
     }
 
     public sealed class WopiCryptoProofChecker : IWopiCryptoProofChecker
@@ -41,6 +42,7 @@ namespace FutureNHS.WOPIHost
         {
             if (httpRequest is null) throw new ArgumentNullException(nameof(httpRequest));
             if (wopiProofKeysProvider is null) throw new ArgumentNullException(nameof(wopiProofKeysProvider));
+            if (wopiProofKeysProvider.IsEmpty) throw new ArgumentOutOfRangeException(nameof(wopiProofKeysProvider), "The prrof keys provider cannot be EMPTY.  Please check it's state before calling this method");
 
             const bool PROOF_IS_INVALID = true;
             const bool PROOF_IS_VALID = false;
@@ -73,7 +75,7 @@ namespace FutureNHS.WOPIHost
             var expectedProof = proof.ToArray();
 
             var givenProof = httpRequest.Headers["X-WOPI-Proof"].Single().Trim();
-            var oldGivenProof = httpRequest.Headers["X-WOPI-ProofOld"].Single()?.Trim();
+            var oldGivenProof = httpRequest.Headers["X-WOPI-ProofOld"].Single().Trim();
 
             var publicKeyCspBlob = wopiProofKeysProvider.PublicKeyCspBlob;
             var oldPublicKeyCspBlob = wopiProofKeysProvider.OldPublicKeyCspBlob;
@@ -117,11 +119,12 @@ namespace FutureNHS.WOPIHost
         /// <param name="signedProof">The proof presented to ourselves that needs to be verified</param>
         /// <param name="publicKeyCspBlob">The CSP Blob the trusted WOPI client is thought to have used to sign the proof source</param>
         /// <returns></returns>
-        private bool IsProven(byte[] expectedProof, string signedProof, string publicKeyCspBlob)
+        private bool IsProven(byte[] expectedProof, string signedProof, string? publicKeyCspBlob)
         {
             Debug.Assert(expectedProof is object && 0 < expectedProof.Length);
             Debug.Assert(!string.IsNullOrWhiteSpace(signedProof));
-            Debug.Assert(!string.IsNullOrWhiteSpace(publicKeyCspBlob));
+
+            if (string.IsNullOrWhiteSpace(publicKeyCspBlob)) throw new ArgumentNullException(nameof(publicKeyCspBlob));
 
             const bool HAS_NOT_BEEN_VERIFIED = false;
 

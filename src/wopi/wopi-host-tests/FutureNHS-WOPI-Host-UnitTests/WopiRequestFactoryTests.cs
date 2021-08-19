@@ -13,20 +13,33 @@ namespace FutureNHS_WOPI_Host_UnitTests
     {
         [TestMethod]
         [ExpectedException(typeof(ArgumentNullException))]
+        public void Ctor_ThrowsIfFileRepositoryIsNull()
+        {
+            var features = new Moq.Mock<IOptionsSnapshot<Features>>().Object;
+
+            _ = new WopiRequestFactory(fileRepository: default, features: features);
+        }
+
+        [TestMethod]
+        [ExpectedException(typeof(ArgumentNullException))]
         public void Ctor_ThrowsIfFeaturesOptionsConfigurationIsNull()
         {
-            _ = new WopiRequestFactory(features: default);
+            var fileRepository = new Moq.Mock<IFileRepository>().Object;
+
+            _ = new WopiRequestFactory(fileRepository, features: default);
         }
 
         [TestMethod]
         [ExpectedException(typeof(ArgumentNullException))]
         public void Ctor_ThrowsIfFeaturesConfigurationIsNull()
         {
+            var fileRepository = new Moq.Mock<IFileRepository>().Object;
+
             var snapshot = new Moq.Mock<IOptionsSnapshot<Features>>();
 
             snapshot.SetupGet(x => x.Value).Returns(default(Features));
 
-            _ = new WopiRequestFactory(features: snapshot.Object);
+            _ = new WopiRequestFactory(fileRepository, features: snapshot.Object);
         }
 
 
@@ -35,13 +48,15 @@ namespace FutureNHS_WOPI_Host_UnitTests
         [ExpectedException(typeof(ArgumentNullException))]
         public void CreateRequest_ThrowsIfHttpRequestIsNull()
         {
+            var fileRepository = new Moq.Mock<IFileRepository>().Object;
+
             var features = new Features();
 
             var snapshot = new Moq.Mock<IOptionsSnapshot<Features>>();
 
             snapshot.SetupGet(x => x.Value).Returns(features);
 
-            IWopiRequestFactory wopiRequestFactory = new WopiRequestFactory(features: snapshot.Object);
+            IWopiRequestFactory wopiRequestFactory = new WopiRequestFactory(fileRepository, features: snapshot.Object);
 
             _ = wopiRequestFactory.CreateRequest(request: default);
         }
@@ -49,13 +64,15 @@ namespace FutureNHS_WOPI_Host_UnitTests
         [TestMethod]
         public void CreateRequest_NoneWopiRequestIsIdentifiedAndIgnored()
         {
+            var fileRepository = new Moq.Mock<IFileRepository>().Object;
+
             var features = new Features();
 
             var snapshot = new Moq.Mock<IOptionsSnapshot<Features>>();
 
             snapshot.SetupGet(x => x.Value).Returns(features);
 
-            IWopiRequestFactory wopiRequestFactory = new WopiRequestFactory(features: snapshot.Object);
+            IWopiRequestFactory wopiRequestFactory = new WopiRequestFactory(fileRepository, features: snapshot.Object);
 
             var httpContext = new DefaultHttpContext();
 
@@ -69,13 +86,15 @@ namespace FutureNHS_WOPI_Host_UnitTests
         [TestMethod]
         public void CreateRequest_WopiRequestWithMissingAccessTokenIsIdentifiedAndIgnored()
         {
+            var fileRepository = new Moq.Mock<IFileRepository>().Object;
+
             var features = new Features();
 
             var snapshot = new Moq.Mock<IOptionsSnapshot<Features>>();
 
             snapshot.SetupGet(x => x.Value).Returns(features);
 
-            IWopiRequestFactory wopiRequestFactory = new WopiRequestFactory(features: snapshot.Object);
+            IWopiRequestFactory wopiRequestFactory = new WopiRequestFactory(fileRepository, features: snapshot.Object);
 
             var httpContext = new DefaultHttpContext();
 
@@ -94,13 +113,15 @@ namespace FutureNHS_WOPI_Host_UnitTests
         [TestMethod]
         public void CreateRequest_WopiRequestWithInvalidAccessTokenIsIdentifiedAndIgnored()
         {
+            var fileRepository = new Moq.Mock<IFileRepository>().Object;
+
             var features = new Features();
 
             var snapshot = new Moq.Mock<IOptionsSnapshot<Features>>();
 
             snapshot.SetupGet(x => x.Value).Returns(features);
 
-            IWopiRequestFactory wopiRequestFactory = new WopiRequestFactory(features: snapshot.Object);
+            IWopiRequestFactory wopiRequestFactory = new WopiRequestFactory(fileRepository, features: snapshot.Object);
 
             var httpContext = new DefaultHttpContext();
 
@@ -120,13 +141,15 @@ namespace FutureNHS_WOPI_Host_UnitTests
         [TestMethod]
         public void CreateRequest_IdentifiesCheckFileInfoRequest()
         {
+            var fileRepository = new Moq.Mock<IFileRepository>().Object;
+
             var features = new Features();
 
             var snapshot = new Moq.Mock<IOptionsSnapshot<Features>>();
 
             snapshot.SetupGet(x => x.Value).Returns(features);
 
-            IWopiRequestFactory wopiRequestFactory = new WopiRequestFactory(features: snapshot.Object);
+            IWopiRequestFactory wopiRequestFactory = new WopiRequestFactory(fileRepository, features: snapshot.Object);
 
             var httpContext = new DefaultHttpContext();
 
@@ -148,13 +171,15 @@ namespace FutureNHS_WOPI_Host_UnitTests
         [TestMethod]
         public void CreateRequest_IdentifiesGetFileRequest()
         {
+            var fileRepository = new Moq.Mock<IFileRepository>().Object;
+
             var features = new Features();
 
             var snapshot = new Moq.Mock<IOptionsSnapshot<Features>>();
 
             snapshot.SetupGet(x => x.Value).Returns(features);
 
-            IWopiRequestFactory wopiRequestFactory = new WopiRequestFactory(features: snapshot.Object);
+            IWopiRequestFactory wopiRequestFactory = new WopiRequestFactory(fileRepository, features: snapshot.Object);
 
             var httpContext = new DefaultHttpContext();
 
@@ -176,13 +201,15 @@ namespace FutureNHS_WOPI_Host_UnitTests
         [TestMethod]
         public void CreateRequest_IdentifiesSaveFileRequest()
         {
+            var fileRepository = new Moq.Mock<IFileRepository>().Object;
+
             var features = new Features();
 
             var snapshot = new Moq.Mock<IOptionsSnapshot<Features>>();
 
             snapshot.SetupGet(x => x.Value).Returns(features);
 
-            IWopiRequestFactory wopiRequestFactory = new WopiRequestFactory(features: snapshot.Object);
+            IWopiRequestFactory wopiRequestFactory = new WopiRequestFactory(fileRepository, features: snapshot.Object);
 
             var httpContext = new DefaultHttpContext();
 
@@ -204,13 +231,15 @@ namespace FutureNHS_WOPI_Host_UnitTests
         [TestMethod]
         public void CreateRequest_IdentifiesAndIgnoresFolderRequest()
         {
+            var fileRepository = new Moq.Mock<IFileRepository>().Object;
+
             var features = new Features();
 
             var snapshot = new Moq.Mock<IOptionsSnapshot<Features>>();
 
             snapshot.SetupGet(x => x.Value).Returns(features);
 
-            IWopiRequestFactory wopiRequestFactory = new WopiRequestFactory(features: snapshot.Object);
+            IWopiRequestFactory wopiRequestFactory = new WopiRequestFactory(fileRepository, features: snapshot.Object);
 
             var httpContext = new DefaultHttpContext();
 

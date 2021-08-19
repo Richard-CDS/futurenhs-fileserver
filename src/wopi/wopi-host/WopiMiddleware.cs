@@ -31,7 +31,11 @@ namespace FutureNHS.WOPIHost
             // middleware in the wrong place but doesn't appear to be any actual side effects.  
             // The next item is the routing middleware and it causes an InvalidOperationException because we've already set
             // the return status code.  Need to investigate whether I've configured something wrong, or if the expected 
-            // behaviour for middleware is to not execute the next item if it handles the request
+            // behaviour for middleware is to not execute the next item if it handles the request.  For now, if we handled 
+            // the WOPI request then not sure what downstream middleware actually needs to execute so just going to return
+
+            if (isWopiRequest) return;
+
             await _next.Invoke(httpContext);
         }
 

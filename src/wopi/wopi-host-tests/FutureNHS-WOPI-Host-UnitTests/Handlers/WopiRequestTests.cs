@@ -34,7 +34,7 @@ namespace FutureNHS_WOPI_Host_UnitTests
 
         [TestMethod]
         [ExpectedException(typeof(OperationCanceledException))]
-        public async Task HandleAsync_ThrowsWhenCancellationTokenCancelledy()
+        public async Task HandleAsync_ThrowsWhenCancellationTokenCancelled()
         {
             using var cts = new CancellationTokenSource();
 
@@ -42,11 +42,13 @@ namespace FutureNHS_WOPI_Host_UnitTests
 
             var features = new Features();
 
+            var fileRepository = new Moq.Mock<IFileRepository>().Object;
+
             var snapshot = new Moq.Mock<IOptionsSnapshot<Features>>();
 
             snapshot.SetupGet(x => x.Value).Returns(features);
 
-            IWopiRequestFactory wopiRequestFactory = new WopiRequestFactory(features: snapshot.Object);
+            IWopiRequestFactory wopiRequestFactory = new WopiRequestFactory(fileRepository, features: snapshot.Object);
 
             var httpContext = new DefaultHttpContext();
 

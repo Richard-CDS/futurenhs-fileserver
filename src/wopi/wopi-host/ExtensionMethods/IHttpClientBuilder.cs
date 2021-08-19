@@ -1,4 +1,5 @@
 ﻿using Microsoft.Extensions.DependencyInjection;
+using System;
 
 namespace FutureNHS.WOPIHost
 {
@@ -12,7 +13,9 @@ namespace FutureNHS.WOPIHost
         /// <returns></returns>
         public static IHttpClientBuilder AddCoreResiliencyPolicies(this IHttpClientBuilder httpClientBuilder)
         {
-            return httpClientBuilder?.AddHttpMessageHandler<HttpHelpers.RetryHandler>();
+            if (httpClientBuilder is null) throw new ArgumentNullException(nameof(httpClientBuilder));
+
+            return httpClientBuilder.AddHttpMessageHandler<HttpHelpers.RetryHandler>();
         }
     }
 }

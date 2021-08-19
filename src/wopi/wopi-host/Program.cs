@@ -44,6 +44,8 @@ namespace FutureNHS.WOPIHost
         // Some information on high availability setup for app config service
         // https://docs.microsoft.com/en-us/azure/azure-app-configuration/concept-disaster-recovery
 
+        // TODO - Remove support for connection string usage and force Azure Identity to be provided if running locally as well as in Azure
+
         public static IHostBuilder CreateHostBuilder(string[] args) =>
             Host.CreateDefaultBuilder(args)
                 .ConfigureWebHostDefaults(webBuilder =>
@@ -52,8 +54,8 @@ namespace FutureNHS.WOPIHost
                         var settings = config.Build();
 
                         // We want to use the application's managed identity (when hosted in Azure) to connect to the configuration service 
-                        // If running locally and your AAD account doesn't have access to it, populate the AzureAppConfiguration:PrimaryConnectionString and optionally 
-                        // the AzureAppConfiguration:SecondaryConnectionString (for multi region failover)
+                        // If running locally and your AAD account doesn't have access to it, populate the AzurePlatform:AzureAppConfiguration:PrimaryConnectionString and optionally 
+                        // the AzurePlatform:AzureAppConfiguration:GeoRedundantReadOnlyConnectionString (for multi region failover)
                         // configuration values and it will connect using that method instead, noting you only need to use read-only keys
 
                         var credential = new DefaultAzureCredential();
@@ -76,14 +78,14 @@ namespace FutureNHS.WOPIHost
                             //      It appears to be a flaw in the Microsoft Extensions and I've been unable to figure out if there is a way to cancel the operation and 
                             //      fall back to using the local configuration settings. 
 
-                            var secondaryConnectionString = settings.GetConnectionString("AzureAppConfiguration:SecondaryRegionReadOnlyConnectionString");
-                            var secondaryEndpoint = settings["AzureAppConfiguration:SecondaryRegionEndpoint"];
+                            var geoRedundantReadOnlyConnectionString = settings.GetConnectionString("AzurePlatform:AzureAppConfiguration:GeoRedundantReadOnlyConnectionString");
+                            var geoRedundantServiceUrl = settings["AzurePlatform:AzureAppConfiguration:GeoRedundantServiceUrl"];
 
-                            var isMultiRegion = !string.IsNullOrWhiteSpace(secondaryConnectionString) || Uri.IsWellFormedUriString(secondaryEndpoint, UriKind.Absolute);
+                            var isMultiRegion = !string.IsNullOrWhiteSpace(geoRedundantReadOnlyConnectionString) || Uri.IsWellFormedUriString(geoRedundantServiceUrl, UriKind.Absolute);
 
                             var environmentLabel = hostingContext.HostingEnvironment.EnvironmentName;
 
-                            var refreshSchedule = settings.GetSection("AzureAppConfiguration").GetValue<int>("CacheExpirationIntervalInSeconds", defaultValue: 60 * 5);
+                            var refreshSchedule = settings.GetSection("AzurePlatform:AzureAppConfiguration").GetValue("CacheExpirationIntervalInSeconds", defaultValue: 60 * 5);
 
                             var cacheExpirationInterval = refreshSchedule >= 1 ? TimeSpan.FromSeconds(refreshSchedule) : TimeSpan.FromMinutes(5);
 
@@ -95,13 +97,13 @@ namespace FutureNHS.WOPIHost
                                         // If the connection string is specified in the configuration, use that instead of relying on a 
                                         // managed identity (which may not work in a local dev environment)
 
-                                        if (!string.IsNullOrWhiteSpace(secondaryConnectionString))
+                                        if (!string.IsNullOrWhiteSpace(geoRedundantReadOnlyConnectionString))
                                         {
-                                            options = options.Connect(secondaryConnectionString);
+                                            options = options.Connect(geoRedundantReadOnlyConnectionString);
                                         }
                                         else
                                         {
-                                            options = options.Connect(new Uri(secondaryEndpoint, UriKind.Absolute), credential);
+                                            options = options.Connect(new Uri(geoRedundantServiceUrl, UriKind.Absolute), credential);
                                         }
 
                                         options.Select(keyFilter: KeyFilter.Any, labelFilter: LabelFilter.Null)
@@ -114,8 +116,8 @@ namespace FutureNHS.WOPIHost
                                     );
                             }
 
-                            var primaryConnectionString = settings.GetConnectionString("AzureAppConfiguration:PrimaryRegionReadOnlyConnectionString");
-                            var primaryEndpoint = settings["AzureAppConfiguration:PrimaryRegionEndpoint"];
+                            var primaryConnectionString = settings.GetConnectionString("AzureAppConfiguration:PrimaryConnectionString");
+                            var primaryServiceUrl = settings["AzurePlatform:AzureAppConfiguration:PrimaryServiceUrl"];
 
                             config.AddAzureAppConfiguration(
                                 options =>
@@ -127,9 +129,9 @@ namespace FutureNHS.WOPIHost
                                     {
                                         options = options.Connect(primaryConnectionString);
                                     }
-                                    else if (Uri.IsWellFormedUriString(primaryEndpoint, UriKind.Absolute))
+                                    else if (Uri.IsWellFormedUriString(primaryServiceUrl, UriKind.Absolute))
                                     {
-                                        options = options.Connect(new Uri(primaryEndpoint, UriKind.Absolute), credential);
+                                        options = options.Connect(new Uri(primaryServiceUrl, UriKind.Absolute), credential);
                                     }
                                     else throw new ApplicationException("If the USE_AZURE_APP_CONFIGURATION environment variable is set to true then either the ConnectionStrings:AzureAppConfiguration-Primary or the AzureAppConfiguration:PrimaryEndpoint setting must be present and well formed");
 
