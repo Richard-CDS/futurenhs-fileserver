@@ -161,6 +161,8 @@ namespace FutureNHS.WOPIHost
 
             var sb = new StringBuilder();
 
+            var config = httpContext.RequestServices.GetRequiredService<IOptionsSnapshot<AzurePlatformConfiguration>>().Value;
+
             sb.AppendLine($"<!doctype html>");
             sb.AppendLine($"<html>");
             sb.AppendLine($"  <body>");
@@ -174,17 +176,14 @@ namespace FutureNHS.WOPIHost
             sb.AppendLine($"      USE_AZURE_APP_CONFIGURATION = {Environment.GetEnvironmentVariable("USE_AZURE_APP_CONFIGURATION")}</br>");
             sb.AppendLine($"    </p>");
             sb.AppendLine($"    <p>");
-            sb.AppendLine($"      <h1>Server Variables</h1></br>");
-
-            var feature = httpContext.Features.OfType<Microsoft.AspNetCore.Http.Features.IServerVariablesFeature>().FirstOrDefault();
-
-            if (feature is object)
-            {
-                // https://docs.microsoft.com/en-us/previous-versions/iis/6.0-sdk/ms524602(v=vs.90)?redirectedfrom=MSDN
-                sb.AppendLine($"      UNENCODED_URL = {feature["UNENCODED_URL"] ?? "null"}</br>");                
-            }
-            else sb.AppendLine($"      IServerVariablesFeature is missing</br>");
-
+            sb.AppendLine($"      <h1>Configuration/h1></br>");
+            sb.AppendLine($"      AzureAppConfiguration:CacheExpirationIntervalInSeconds = { config.AzureAppConfiguration?.CacheExpirationIntervalInSeconds }</br>");
+            sb.AppendLine($"      AzureAppConfiguration:PrimaryServiceUrl = { config.AzureAppConfiguration?.PrimaryServiceUrl }</br>");
+            sb.AppendLine($"      AzureAppConfiguration:GeoRedundantServiceUrl = { config.AzureAppConfiguration?.GeoRedundantServiceUrl }</br>");
+            sb.AppendLine($"      <br/>");
+            sb.AppendLine($"      AzureBlobStorage:PrimaryServiceUrl = { config.AzureBlobStorage?.PrimaryServiceUrl }</br>");
+            sb.AppendLine($"      AzureBlobStorage:GeoRedundantServiceUrl = { config.AzureBlobStorage?.GeoRedundantServiceUrl }</br>");
+            sb.AppendLine($"      AzureBlobStorage:ContainerName = { config.AzureBlobStorage?.ContainerName }</br>");
             sb.AppendLine($"    </p>");
             sb.AppendLine($"  </body>");
             sb.AppendLine($"</html>");

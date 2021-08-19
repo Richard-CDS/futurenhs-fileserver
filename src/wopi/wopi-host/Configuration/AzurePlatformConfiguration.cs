@@ -21,7 +21,5 @@ namespace FutureNHS.WOPIHost.Configuration
 
         public Uri? PrimaryServiceUrl { get; set; }
         public Uri? GeoRedundantServiceUrl { get; set; }
-
-        public Uri? GeoRedundantReadOnlyConnectionString { get; set; }
     }
 }
