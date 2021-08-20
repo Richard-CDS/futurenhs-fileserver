@@ -74,7 +74,7 @@ namespace FutureNHS.WOPIHost
             //      the relevant metadata needed for us to operate correctly.  Hopefully this will prove to be just a temporary
             //      workaround
 
-            var version = "1.0";
+            var version = "1.0";// - need to get this in the file name or use a db lookup;
 
             if (fileName.EndsWith("/contents"))
             {

@@ -49,6 +49,6 @@ namespace FutureNHS_WOPI_Host_UnitTests
 
             Assert.IsTrue(0 < fileBytes.Length);
         }
-    }
 #endif
+    }
 }

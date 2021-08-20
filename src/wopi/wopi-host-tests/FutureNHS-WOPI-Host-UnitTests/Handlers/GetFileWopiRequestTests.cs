@@ -114,9 +114,9 @@ namespace FutureNHS_WOPI_Host_UnitTests.Handlers
 
             var filePath = Path.Combine(contentRootPath, "Files", fileName);
 
-            Assert.IsTrue(File.Exists(filePath), $"Expected the {fileName} file to be accessible in the test environment");
+            Assert.IsTrue(System.IO.File.Exists(filePath), $"Expected the {fileName} file to be accessible in the test environment");
 
-            var fileBuffer = await File.ReadAllBytesAsync(filePath, cancellationToken);
+            var fileBuffer = await System.IO.File.ReadAllBytesAsync(filePath, cancellationToken);
 
             using var responseBodyStream = new MemoryStream(fileBuffer.Length);
             
