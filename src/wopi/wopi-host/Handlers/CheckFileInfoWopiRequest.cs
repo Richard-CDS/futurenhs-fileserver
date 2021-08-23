@@ -1,5 +1,6 @@
 ﻿using FutureNHS.WOPIHost.Configuration;
 using Microsoft.AspNetCore.Http;
+using Microsoft.Extensions.DependencyInjection;
 using System;
 using System.Dynamic;
 using System.Threading;
@@ -10,24 +11,20 @@ namespace FutureNHS.WOPIHost.Handlers
     internal sealed class CheckFileInfoWopiRequest
         : WopiRequest
     {
-        private const int FILENAME_MAXIMUM_LENGTH = 100;
-
-        private readonly string _fileName;
-        private readonly string? _fileVersion;
+        private readonly File _file;
         private readonly Features? _features;
 
-        private CheckFileInfoWopiRequest(string fileName, string? fileVersion, string accessToken, Features? features) 
+        private CheckFileInfoWopiRequest(File file, string accessToken, Features? features) 
             : base(accessToken, isWriteAccessRequired: false) 
         {
-            if (string.IsNullOrWhiteSpace(fileName)) throw new ArgumentNullException(nameof(fileName));
+            if (file.IsEmpty) throw new ArgumentNullException(nameof(file));
 
-            _fileName = fileName;
-            _fileVersion = fileVersion;
+            _file = file;
 
             _features = features;
         }
 
-        internal static CheckFileInfoWopiRequest With(string fileName, string? fileVersion, string accessToken, Features features) => new CheckFileInfoWopiRequest(fileName, fileVersion, accessToken, features);
+        internal static CheckFileInfoWopiRequest With(File file, string accessToken, Features features) => new CheckFileInfoWopiRequest(file, accessToken, features);
 
         protected override async Task HandleAsyncImpl(HttpContext context, CancellationToken cancellationToken)
         {
@@ -42,27 +39,27 @@ namespace FutureNHS.WOPIHost.Handlers
             // NB - Collabora does not implement the full WOPI specification and thus only meets the bare minimum specification.
             //      You can find more information in their 'Integration of Collabora Online with WOPI' document
             
-            // TODO - How do we handle the null file version situation .. constructed file name that includes version or db lookup?
+            var fileRepository = context.RequestServices.GetRequiredService<IFileRepository>();
 
-            //var fileMetadataRepository = context.RequestServices.GetRequiredService<IFileMetadataRepository>();
+            var fileMetadata = await fileRepository.GetAsync(_file, cancellationToken);
 
-
-            //var fileMetadata = fileMetadataRepository.GetAsync(_fileName, _fileVersion, cancellationToken);
+            // TODO - Get user context from the authenticated user
 
 
             dynamic responseBody = new ExpandoObject();
 
             // Mandatory
 
-            responseBody.BaseFileName = "fileMetaData.Name"; // used as a display element in the UI
-            responseBody.OwnerId = "richard.ashman@cds.co.uk";//fileMetaData.OwnerId  // uniquely identities the owner of the file - usage not yet clear but might be tied to collaborative editing feature
-            responseBody.Size = 1; // fileMetaData.Size; // the size of the file in bytes
+            responseBody.BaseFileName = fileMetadata.Title; // used as a display element in the UI
+            responseBody.OwnerId = fileMetadata.Owner;  // uniquely identities the owner of the file - usage not yet clear but might be tied to collaborative editing feature
+            responseBody.Size = fileMetadata.SizeInBytes; // the size of the file in bytes
             responseBody.UserId = "richard@iprogrammer.co.uk"; //userMetadata.Id // uniquely identifies the user accessing the file - usage not yet clear but might be tied to collaborative editing feature
 
             // Where did this one come from - WOPI spec?
-            responseBody.Version = "1.0"; //fileMetaData.VersionId;  
+            responseBody.Version = fileMetadata.Version;  
 
             // Host capabilities (defaults to false if excluded)
+            // TODO - Pull from feature configuration and also user context
 
             var supportsUpdate = !(_features is null) && _features.AllowFileEdit;
 
@@ -112,7 +109,7 @@ namespace FutureNHS.WOPIHost.Handlers
 
             // PostMessage 
 
-            responseBody.BreadcrumbBrandName = "FutureNHS";
+            responseBody.BreadcrumbBrandName = "FutureNHS Open"; // TODO - pull from config file
             responseBody.BreadcrumbBrandUrl = string.Empty;
  //           responseBody.BreadcrumbDocName = fileInfo.Name;
  //           responseBody.BreadcrumbFolderName = fileInfo.Directory.Name;
@@ -128,11 +125,11 @@ namespace FutureNHS.WOPIHost.Handlers
             responseBody.CopyPasteRestrictions = "CurrentDocumentOnly"; // BlockAll | CurrentDocumentOnly
             responseBody.DisablePrint = false;
             responseBody.DisableTranslation = false;
- //           responseBody.FileExtension = fileInfo.Extension;
-            responseBody.FileNameMaxLength = FILENAME_MAXIMUM_LENGTH;
- //           responseBody.LastModifiedTime = fileInfo.LastWriteTimeUtc.ToString("o", CultureInfo.InvariantCulture); // "2021-04-19T13:00:00.0000000Z";
+            responseBody.FileExtension = fileMetadata.Extension;
+            responseBody.FileNameMaxLength = File.FILENAME_MAXIMUM_LENGTH;
+            responseBody.LastModifiedTime = fileMetadata.LastWriteTimeIso8601; // "2021-04-19T13:00:00.0000000Z";
             responseBody.RequestedCallThrottling = "Normal"; // Normal | Minor | Medium | Major | Critical
-                                                             //responseBody.SHA256 = 256 bit sha-2 encoded base 64 hash of the file contents
+            //responseBody.SHA256 = 256 bit sha-2 encoded base 64 hash of the file contents
             responseBody.SharingStatus = "Private"; // Private | Shared
             //responseBody.UniqueContentId = "";
 
@@ -146,11 +143,12 @@ namespace FutureNHS.WOPIHost.Handlers
             responseBody.DisableExport = false;
             responseBody.DisableCopy = false;
             responseBody.EnableOwnerTermination = false;
-            responseBody.LastModifiedTime = "ISO8601";
-
+            
             await context.Response.StartAsync();
 
             await System.Text.Json.JsonSerializer.SerializeAsync(context.Response.Body, responseBody, cancellationToken: cancellationToken);
+
+            context.Response.ContentType = "application/json";
         }
     }
 }

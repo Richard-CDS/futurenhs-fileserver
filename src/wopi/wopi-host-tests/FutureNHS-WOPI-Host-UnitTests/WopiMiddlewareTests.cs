@@ -103,7 +103,9 @@ namespace FutureNHS_WOPI_Host_UnitTests
 
             var wopiRequestFactory = new Moq.Mock<IWopiRequestFactory>();
 
-            wopiRequestFactory.Setup(x => x.CreateRequest(Moq.It.IsAny<HttpRequest>())).Returns(WopiRequest.EMPTY).Callback(() => { requestFactoryInvoked = true; });
+            var emptyWopiRequest = WopiRequest.EMPTY;
+
+            wopiRequestFactory.Setup(x => x.TryCreateRequest(Moq.It.IsAny<HttpRequest>(), out emptyWopiRequest)).Returns(false).Callback(() => { requestFactoryInvoked = true; });
 
             services.AddScoped(sp => wopiRequestFactory.Object);
 
@@ -118,6 +120,9 @@ namespace FutureNHS_WOPI_Host_UnitTests
             Assert.IsTrue(requestFactoryInvoked, "Expected the wopi request factory to have been deferred to such that it could identify if the request was WOPI related or not");
         }
 
+
+        delegate void TryCreateRequestDelegate(HttpRequest httpRequest, out WopiRequest wopiRequest);
+
         [TestMethod]
         public async Task Invoke_ProcessRequest_DefersToWopiProofCheckerToVerifyPresentedProofs()
         {
@@ -129,11 +134,15 @@ namespace FutureNHS_WOPI_Host_UnitTests
 
             var configuration = configurationBuilder.Build();
 
-            var wopiRequest = new WopiRequestStub((_, __) => Task.CompletedTask);
+            var wopiRequestStub = new WopiRequestStub((_, __) => Task.CompletedTask);
 
             var wopiRequestFactory = new Moq.Mock<IWopiRequestFactory>();
 
-            wopiRequestFactory.Setup(x => x.CreateRequest(Moq.It.IsAny<HttpRequest>())).Returns(wopiRequest);
+            var wopiRequest = default(WopiRequest);
+
+            wopiRequestFactory.Setup(x => x.TryCreateRequest(Moq.It.IsAny<HttpRequest>(), out wopiRequest)).
+                Callback(new TryCreateRequestDelegate((HttpRequest httpRequest, out WopiRequest _) => _ = wopiRequestStub)).
+                Returns(true);
 
             var proofCheckerInvoked = false;
 
@@ -172,7 +181,7 @@ namespace FutureNHS_WOPI_Host_UnitTests
             var httpRequest = httpContext.Request;
 
             httpRequest.Method = HttpMethods.Get;
-            httpRequest.Path = "/wopi/files/fileidgoeshere";
+            httpRequest.Path = "/wopi/files/file-name|file-version";
             httpRequest.QueryString = new QueryString("?access_token=tokengoeshere");
 
             var wopiMiddleware = new WopiMiddleware(default);
@@ -224,11 +233,15 @@ namespace FutureNHS_WOPI_Host_UnitTests
 
             var wopiRequestHandlerInvoked = false;
 
-            var wopiRequest = new WopiRequestStub((_, __) => { wopiRequestHandlerInvoked = true; return Task.CompletedTask; });
+            var wopiRequestStub = new WopiRequestStub((_, __) => { wopiRequestHandlerInvoked = true; return Task.CompletedTask; });
 
             var wopiRequestFactory = new Moq.Mock<IWopiRequestFactory>();
 
-            wopiRequestFactory.Setup(x => x.CreateRequest(Moq.It.IsAny<HttpRequest>())).Returns(wopiRequest);
+            var wopiRequest = default(WopiRequest);
+
+            wopiRequestFactory.Setup(x => x.TryCreateRequest(Moq.It.IsAny<HttpRequest>(), out wopiRequest)).
+                Callback(new TryCreateRequestDelegate((HttpRequest httpRequest, out WopiRequest _) => _ = wopiRequestStub)).
+                Returns(true);
 
             var wopiCryptoProofChecker = new Moq.Mock<IWopiCryptoProofChecker>();
 
@@ -265,7 +278,7 @@ namespace FutureNHS_WOPI_Host_UnitTests
             var httpRequest = httpContext.Request;
 
             httpRequest.Method = HttpMethods.Get;
-            httpRequest.Path = "/wopi/files/fileidgoeshere";
+            httpRequest.Path = "/wopi/files/file-name|file-version";
             httpRequest.QueryString = new QueryString("?access_token=tokengoeshere");
 
             var wopiMiddleware = new WopiMiddleware(default);
@@ -327,10 +340,8 @@ namespace FutureNHS_WOPI_Host_UnitTests
             var httpRequest = httpContext.Request;
 
             httpRequest.Method = HttpMethods.Get;
-            httpRequest.Path = "/wopi/files/fileidgoeshere/contents";
+            httpRequest.Path = "/wopi/files/file-name|file-version/contents";
             httpRequest.QueryString = new QueryString("?access_token=tokengoeshere");
-
-            httpRequest.Headers["X-WOPI-ItemVersion"] = "file-version";
 
             var wopiMiddleware = new WopiMiddleware(default);
 
@@ -375,10 +386,8 @@ namespace FutureNHS_WOPI_Host_UnitTests
             var httpRequest = httpContext.Request;
 
             httpRequest.Method = HttpMethods.Get;
-            httpRequest.Path = "/wopi/files/fileidgoeshere";
+            httpRequest.Path = "/wopi/files/file-name|file-version";
             httpRequest.QueryString = new QueryString("?access_token=tokengoeshere");
-
-            httpRequest.Headers["X-WOPI-ItemVersion"] = "file-version";
 
             var wopiMiddleware = new WopiMiddleware(default);
 

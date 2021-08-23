@@ -14,18 +14,24 @@ namespace FutureNHS.WOPIHost
         /// <summary>
         /// Tasked with retrieving a file located in storage and writing it into <paramref name="streamToWriteTo"/>
         /// </summary>
-        /// <param name="fileName">The name of the file as used in storage</param>
-        /// <param name="fileVersion">The version of the file that the caller wishes to retrieve</param>
+        /// <param name="file">The name and version of the file to be used to locate the requested file in storage</param>
         /// <param name="streamToWriteTo">The stream to which the content of the file will be written in the success case/></param>
         /// <param name="cancellationToken"></param>
         /// <returns></returns>
-        Task WriteToStreamAsync(string fileName, string fileVersion, Stream streamToWriteTo, CancellationToken cancellationToken);
+        Task<FileWriteDetails> WriteToStreamAsync(File file, Stream streamToWriteTo, CancellationToken cancellationToken);
+
+        /// <summary>
+        /// Tasked with retrieving the extended metadata for a specific file version
+        /// </summary>
+        /// <param name="file">The details of the file and version for which the extended metadata is being requested</param>
+        /// <param name="cancellationToken"></param>
+        /// <returns>The requested metadata in the success case</returns>
+        Task<FileMetadata> GetAsync(File file, CancellationToken cancellationToken);
     }
 
     public sealed class FileRepository : IFileRepository
     {
         private readonly IAzureBlobStoreClient _azureBlobStoreClient;
-        private readonly IOptionsSnapshot<AzurePlatformConfiguration> _azurePlatformConfiguration;
         private readonly ILogger<FileRepository>? _logger;
 
         private readonly string _containerName;
@@ -34,8 +40,9 @@ namespace FutureNHS.WOPIHost
         {
             _logger = logger;
 
-            _azureBlobStoreClient = azureBlobStoreClient             ?? throw new ArgumentNullException(nameof(azureBlobStoreClient));
-            _azurePlatformConfiguration = azurePlatformConfiguration ?? throw new ArgumentNullException(nameof(azurePlatformConfiguration));
+            _azureBlobStoreClient = azureBlobStoreClient ?? throw new ArgumentNullException(nameof(azureBlobStoreClient));
+            
+            if (azurePlatformConfiguration?.Value is null) throw new ArgumentNullException(nameof(azurePlatformConfiguration));
 
             var containerName = azurePlatformConfiguration.Value.AzureBlobStorage?.ContainerName;
 
@@ -44,25 +51,35 @@ namespace FutureNHS.WOPIHost
             _containerName = containerName;
         }
 
-        async Task IFileRepository.WriteToStreamAsync(string fileName, string fileVersion, Stream streamToWriteTo, CancellationToken cancellationToken)
+        async Task<FileMetadata> IFileRepository.GetAsync(File file, CancellationToken cancellationToken)
+        {
+            if (file.IsEmpty) throw new ArgumentNullException(nameof(file));
+
+            cancellationToken.ThrowIfCancellationRequested();
+
+            // TODO - Implement properly
+
+            return new FileMetadata("file-title", "file-description", file.Version, "file-owner", file.Name, "file-extension", 999, DateTimeOffset.UtcNow.AddDays(-1), "content-hash");
+        }
+
+        async Task<FileWriteDetails> IFileRepository.WriteToStreamAsync(File file, Stream streamToWriteTo, CancellationToken cancellationToken)
         {
             cancellationToken.ThrowIfCancellationRequested();
 
-            var downloadDetails = await _azureBlobStoreClient.FetchBlobAndWriteToStream(_containerName, fileName, fileVersion, streamToWriteTo, cancellationToken);
+            if (file.IsEmpty) throw new ArgumentNullException(nameof(file));
 
-            // TODO - figure out useful information to return to the caller.  Might only be needed for file info requests but wondering 
-            //        if we should store the hash when a doc is uploaded and then x-check it before allowing user to edit/download
+            var downloadDetails = await _azureBlobStoreClient.FetchBlobAndWriteToStream(_containerName, file.Name, file.Version, streamToWriteTo, cancellationToken);
 
-            var contentType = downloadDetails.ContentType;
-
-            var hash = downloadDetails.ContentHash;
-
-            var etag = downloadDetails.ETag;
-
-            var versionId = downloadDetails.VersionId;
-
+            return new FileWriteDetails(
+                version: downloadDetails.VersionId,
+                contentHash: downloadDetails.ContentHash,               // https://blogs.msdn.microsoft.com/windowsazurestorage/2011/02/17/windows-azure-blob-md5-overview/
+                contentEncoding: downloadDetails.ContentEncoding,
+                contentLanguage: downloadDetails.ContentLanguage,
+                contentType: downloadDetails.ContentType,
+                contentLength: 0 > downloadDetails.ContentLength ? 0 : (ulong)downloadDetails.ContentLength,
+                lastAccessed: DateTimeOffset.MinValue == downloadDetails.LastAccessed ? default : downloadDetails.LastAccessed,
+                lastModified: downloadDetails.LastModified
+                );
         }
-
-
     }
 }

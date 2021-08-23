@@ -5,8 +5,10 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using System;
 using System.IO;
+using System.Security.Cryptography;
 using System.Threading;
 using System.Threading.Tasks;
+using File = FutureNHS.WOPIHost.File;
 
 namespace FutureNHS_WOPI_Host_UnitTests.Handlers
 {
@@ -15,83 +17,44 @@ namespace FutureNHS_WOPI_Host_UnitTests.Handlers
     {
         [TestMethod]
         [ExpectedException(typeof(ArgumentNullException))]
-        public void With_ThrowsIfFilenameIsNull()
+        public void With_ThrowsIfFileIsEmpty()
         {
-            GetFileWopiRequest.With(fileName: default, fileVersion: "file-version", accessToken: "access-token");
-        }
-
-        [TestMethod]
-        [ExpectedException(typeof(ArgumentNullException))]
-        public void With_ThrowsIfFilenameIsEmpty()
-        {
-            GetFileWopiRequest.With(fileName: string.Empty, fileVersion: "file-version", accessToken: "access-token");
-        }
-
-        [TestMethod]
-        [ExpectedException(typeof(ArgumentNullException))]
-        public void With_ThrowsIfFilenameIsWhitespace()
-        {
-            GetFileWopiRequest.With(fileName: " ", fileVersion: "file-version", accessToken: "access-token");
-        }
-
-        [TestMethod]
-        public void With_DoesNotThrowIfFilenameIsNotNullOrWhitespace()
-        {
-            GetFileWopiRequest.With("file-name", fileVersion: "file-version", accessToken: "access-token");
-        }
-
-        [TestMethod]
-        [ExpectedException(typeof(ArgumentNullException))]
-        public void With_ThrowsIfFileVersionIsNull()
-        {
-            GetFileWopiRequest.With(fileName: "file-name", fileVersion: default, accessToken: "access-token");
-        }
-
-        [TestMethod]
-        [ExpectedException(typeof(ArgumentNullException))]
-        public void With_ThrowsIfFileVersionIsEmpty()
-        {
-            GetFileWopiRequest.With(fileName: string.Empty, fileVersion: string.Empty, accessToken: "access-token");
-        }
-
-        [TestMethod]
-        [ExpectedException(typeof(ArgumentNullException))]
-        public void With_ThrowsIfFileVersionIsWhitespace()
-        {
-            GetFileWopiRequest.With(fileName: " ", fileVersion: " ", accessToken: "access-token");
-        }
-
-        [TestMethod]
-        public void With_DoesNotThrowIfFileVersionIsNotNullOrWhitespace()
-        {
-            GetFileWopiRequest.With("file-name", fileVersion: "file-version", accessToken: "access-token");
+            GetFileWopiRequest.With(File.EMPTY, accessToken: "access-token");
         }
 
         [TestMethod]
         [ExpectedException(typeof(ArgumentNullException))]
         public void With_ThrowsIfAccessTokenIsNull()
         {
-            GetFileWopiRequest.With("file-name", fileVersion: "file-version", accessToken: default);
+            var file = File.With("file-name", "file-version");
+
+            GetFileWopiRequest.With(file, accessToken: default);
         }
 
         [TestMethod]
         [ExpectedException(typeof(ArgumentNullException))]
         public void With_ThrowsIfAccessTokenIsEmpty()
         {
-            GetFileWopiRequest.With("file-name", fileVersion: "file-version", accessToken: string.Empty);
+            var file = File.With("file-name", "file-version");
+
+            GetFileWopiRequest.With(file, accessToken: string.Empty);
         }
 
         [TestMethod]
         [ExpectedException(typeof(ArgumentNullException))]
         public void With_ThrowsIfAccessTokenIsWhitespace()
         {
-            GetFileWopiRequest.With("file-name", fileVersion: "file-version", accessToken: " ");
+            var file = File.With("file-name", "file-version");
+
+            GetFileWopiRequest.With(file, accessToken: " ");
         }
 
         [TestMethod]
-        public void With_DoesNotThrowIfAccessTokenIsNotNullOrWhitespace()
+        public void With_DoesNotThrowIfAccessTokenIsNeitherNullNorWhitespace()
         {
-            GetFileWopiRequest.With("file-name", fileVersion: "file-version", accessToken: "access-token");
+            var file = File.With("file-name", "file-version");
+
+            GetFileWopiRequest.With(file, accessToken: "access-token");
         }
 
 
@@ -116,6 +79,8 @@ namespace FutureNHS_WOPI_Host_UnitTests.Handlers
 
             Assert.IsTrue(System.IO.File.Exists(filePath), $"Expected the {fileName} file to be accessible in the test environment");
 
+            var fileInfo = new FileInfo(filePath);
+
             var fileBuffer = await System.IO.File.ReadAllBytesAsync(filePath, cancellationToken);
 
             using var responseBodyStream = new MemoryStream(fileBuffer.Length);
@@ -134,19 +99,24 @@ namespace FutureNHS_WOPI_Host_UnitTests.Handlers
 
             var fileVersion = Guid.NewGuid().ToString();
 
-            fileRepository.
-                Setup(x => x.WriteToStreamAsync(Moq.It.IsAny<string>(), Moq.It.IsAny<string>(), Moq.It.IsAny<Stream>(), Moq.It.IsAny<CancellationToken>())).
-                Callback(async (string givenFileName, string givenFileVersion, Stream givenStream, CancellationToken givenCancellationToken) => {
+            using var algo = MD5.Create();
 
-                    Assert.IsNotNull(givenFileName);
-                    Assert.IsNotNull(givenFileVersion);
+            var contentHash = algo.ComputeHash(fileBuffer);
+
+            var fileWriteDetails = new FileWriteDetails(fileVersion, "content-type", contentHash, (ulong)fileBuffer.Length, "content-encoding", "content-language", DateTimeOffset.UtcNow, DateTimeOffset.UtcNow);
+
+            fileRepository.
+                Setup(x => x.WriteToStreamAsync(Moq.It.IsAny<File>(), Moq.It.IsAny<Stream>(), Moq.It.IsAny<CancellationToken>())).
+                Callback(async (File givenFile, Stream givenStream, CancellationToken givenCancellationToken) => {
+
+                    Assert.IsFalse(givenFile.IsEmpty);
                     Assert.IsNotNull(givenStream);
 
                     Assert.IsFalse(givenCancellationToken.IsCancellationRequested, "Expected the cancellation token to not be cancelled");
 
                     Assert.AreSame(responseBodyStream, givenStream, "Expected the SUT to as the repository to write the file to the stream it was asked to");
-                    Assert.AreSame(fileName, givenFileName, "Expected the SUT to request the file from the repository whose name it was provided with");
-                    Assert.AreSame(fileVersion, givenFileVersion, "Expected the SUT to request the file version from the repository that it was provided with");
+                    Assert.AreSame(fileName, givenFile.Name, "Expected the SUT to request the file from the repository whose name it was provided with");
+                    Assert.AreSame(fileVersion, givenFile.Version, "Expected the SUT to request the file version from the repository that it was provided with");
                     Assert.AreEqual(cancellationToken, givenCancellationToken, "Expected the same cancellation token to propagate between service interfaces");
 
                     await givenStream.WriteAsync(fileBuffer, cancellationToken);
@@ -154,11 +124,17 @@ namespace FutureNHS_WOPI_Host_UnitTests.Handlers
 
                     fileRepositoryInvoked = true;
                 }).
-                Returns(Task.CompletedTask);
+                Returns(Task.FromResult(fileWriteDetails));
+
+            var fileMetadata = new FileMetadata("title", "description", fileVersion, "owner", fileName, fileInfo.Extension, (ulong)fileBuffer.Length, fileInfo.LastWriteTimeUtc, Convert.ToBase64String(contentHash));
+
+            fileRepository.Setup(x => x.GetAsync(Moq.It.IsAny<File>(), Moq.It.IsAny<CancellationToken>())).Returns(Task.FromResult(fileMetadata));
 
             var accessToken = Guid.NewGuid().ToString();
 
-            var getFileWopiRequest = GetFileWopiRequest.With(fileName, fileVersion, accessToken);
+            var file = File.With(fileName, fileVersion);
+
+            var getFileWopiRequest = GetFileWopiRequest.With(file, accessToken);
 
             await getFileWopiRequest.HandleAsync(httpContext, cancellationToken);
 

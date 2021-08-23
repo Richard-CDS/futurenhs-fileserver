@@ -5,7 +5,6 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using System;
-using System.IO;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -20,7 +19,7 @@ namespace FutureNHS_WOPI_Host_UnitTests
 
 #if DEBUG
         [TestMethod]
-        public async Task GetAsync_()
+        public async Task WriteToStreamAsync_SanityCheckForLocalDevOnly()
         {
             var cancellationToken = new CancellationToken();
 
@@ -41,13 +40,20 @@ namespace FutureNHS_WOPI_Host_UnitTests
 
             IFileRepository fileRepository = new FileRepository(azureBlobStorageClient, azurePlatformConfigurationOptionsSnapshot.Object, logger);
 
-            using var destinationStream = new MemoryStream();
+            var file = File.With("4d6fa0f8-34a7-4f34-922f-8b06416097e1.pdf", "2021-08-09T18:15:02.4214747Z");
 
-            await fileRepository.WriteToStreamAsync("4d6fa0f8-34a7-4f34-922f-8b06416097e1.pdf", "2021-08-09T18:15:02.4214747Z", destinationStream, cancellationToken);
+            using var destinationStream = new System.IO.MemoryStream();
+
+            var fileWriteDetails = await fileRepository.WriteToStreamAsync(file, destinationStream, cancellationToken);
+
+            Assert.IsNotNull(fileWriteDetails);
 
             var fileBytes = destinationStream.ToArray();
 
-            Assert.IsTrue(0 < fileBytes.Length);
+            Assert.IsTrue(396764 == fileBytes.Length);
+            Assert.IsTrue(396764 == fileWriteDetails.ContentLength);
+
+            Assert.AreEqual("8n45KHxmXabrze7rq/s9Ww==", fileWriteDetails.ContentHash);
         }
 #endif
     }

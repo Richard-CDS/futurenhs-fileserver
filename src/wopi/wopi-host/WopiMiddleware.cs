@@ -1,5 +1,6 @@
 ﻿using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using System;
 using System.Threading.Tasks;
 
@@ -54,17 +55,21 @@ namespace FutureNHS.WOPIHost
 
             cancellationToken.ThrowIfCancellationRequested();
 
+            var logger = httpContext.RequestServices.GetService<ILogger<WopiMiddleware>>();
+
             var wopiRequestFactory = httpContext.RequestServices.GetRequiredService<IWopiRequestFactory>();
 
-            var wopiRequest = wopiRequestFactory.CreateRequest(httpContext.Request);
+            if (!wopiRequestFactory.TryCreateRequest(httpContext.Request, out var wopiRequest)) return THIS_IS_NOT_A_WOPI_REQUEST;
 
-            if (wopiRequest.IsEmpty) return THIS_IS_NOT_A_WOPI_REQUEST; 
+            logger?.LogTrace($"Looks like a WOPI request so going to try and route it to the correct handler");
 
             var wopiDiscoveryDocumentFactory = httpContext.RequestServices.GetRequiredService<IWopiDiscoveryDocumentFactory>();
 
             var wopiDiscoveryDocument = await wopiDiscoveryDocumentFactory.CreateDocumentAsync(cancellationToken);
 
             if (wopiDiscoveryDocument.IsEmpty) throw new ApplicationException("This is a WOPI request but the WOPI discovery document is temporarily unavilable/inaccessible and so the request cannot be processed");
+
+            logger?.LogTrace($"Resolved discovery document to use so time to try and validate the proof offered by the caller");
 
             var wopiCryptoProofChecker = httpContext.RequestServices.GetRequiredService<IWopiCryptoProofChecker>();
 
@@ -73,6 +78,8 @@ namespace FutureNHS.WOPIHost
             if (refetchProofKeys) wopiDiscoveryDocument.IsTainted = true;
 
             if (isInvalid) throw new ApplicationException("This is a WOPI request but the proof that has been provided is considered invalid for this host to process");
+
+            logger?.LogTrace($"Proof determined valid so routing to the handler of the request: '{wopiRequest.GetType().Name}'");
 
             await wopiRequest.HandleAsync(httpContext, cancellationToken);
 

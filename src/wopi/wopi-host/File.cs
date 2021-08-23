@@ -5,13 +5,24 @@ namespace FutureNHS.WOPIHost
     public struct File
         : IEquatable<File>
     {
+        internal const int FILENAME_MAXIMUM_LENGTH = 100;
+        internal const int FILENAME_MINIMUM_LENGTH = 5;
+
         private File(string fileName, string fileVersion)
         {
+            if (string.IsNullOrWhiteSpace(fileName)) throw new ArgumentNullException(nameof(fileName));
+            if (string.IsNullOrWhiteSpace(fileVersion)) throw new ArgumentNullException(nameof(fileVersion));
+
+            if (100 < fileName.Length) throw new ArgumentOutOfRangeException(nameof(fileName), $"Maximum allowed filename length is {FILENAME_MAXIMUM_LENGTH} characters");
+            if (5 > fileName.Length) throw new ArgumentOutOfRangeException(nameof(fileName), $"Minimum allowed filename length is {FILENAME_MINIMUM_LENGTH} characters");
+
             Name = fileName;
             Version = fileVersion;
 
             Id = string.Concat(fileName, '|', fileVersion);
         }
+
+        public static File EMPTY { get; } = new File();
 
         public string Id { get; }
         public string Name { get; }
@@ -21,25 +32,22 @@ namespace FutureNHS.WOPIHost
 
         public static File With(string fileName, string fileVersion)
         {
-            if (string.IsNullOrWhiteSpace(fileName)) throw new ArgumentNullException(nameof(fileName));
-            if (string.IsNullOrWhiteSpace(fileVersion)) throw new ArgumentNullException(nameof(fileVersion));
-
             return new File(fileName, fileVersion);
         }
 
         private static File With(string id)
         {
-            if (string.IsNullOrWhiteSpace(id)) return new File();
+            if (string.IsNullOrWhiteSpace(id)) return EMPTY;
 
             var segments = id.Split('|', StringSplitOptions.RemoveEmptyEntries);
 
-            if (2 != segments.Length) return new File();
+            if (2 != segments.Length) return EMPTY;
 
             var fileName = segments[0];
             var fileVersion = segments[1];
 
-            if (string.IsNullOrWhiteSpace(fileName)) return new File();
-            if (string.IsNullOrWhiteSpace(fileVersion)) return new File();
+            if (string.IsNullOrWhiteSpace(fileName)) return EMPTY;
+            if (string.IsNullOrWhiteSpace(fileVersion)) return EMPTY;
 
             return new File(fileName.Trim(), fileVersion.Trim());
         }

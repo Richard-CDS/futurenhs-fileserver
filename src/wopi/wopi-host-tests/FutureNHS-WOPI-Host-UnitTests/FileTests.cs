@@ -1,7 +1,6 @@
 ﻿using FutureNHS.WOPIHost;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using System;
-using System.Linq;
 
 namespace FutureNHS_WOPI_Host_UnitTests
 {
@@ -68,6 +67,24 @@ namespace FutureNHS_WOPI_Host_UnitTests
             Assert.AreEqual(id, file.Id);
         }
 
+        [TestMethod]
+        [ExpectedException(typeof(ArgumentOutOfRangeException))]
+        public void With_MinimumFileLengthIsEnforced()
+        {
+            var fileName = new string('x', File.FILENAME_MINIMUM_LENGTH - 1);
+
+            _ = File.With(fileName, "file-version");
+        }
+
+        [TestMethod]
+        [ExpectedException(typeof(ArgumentOutOfRangeException))]
+        public void With_MaximumFileLengthIsEnforced()
+        {
+            var fileName = new string('x', File.FILENAME_MAXIMUM_LENGTH + 1);
+
+            _ = File.With(fileName, "file-version");
+        }
+
 
 
         [TestMethod]
@@ -91,6 +108,10 @@ namespace FutureNHS_WOPI_Host_UnitTests
             Assert.IsTrue(file2.Equals(file1));
             Assert.IsTrue(file2.Equals(file2));
 
+            Assert.IsTrue(file1 == file1);
+            Assert.IsTrue(file1 == file2);
+            Assert.IsTrue(file2 == file1);
+
             file1 = File.With("file-name", "file-version");
             file2 = File.With("file-name", "file-version");
 
@@ -98,6 +119,10 @@ namespace FutureNHS_WOPI_Host_UnitTests
             Assert.IsTrue(file1.Equals(file2));
             Assert.IsTrue(file2.Equals(file1));
             Assert.IsTrue(file2.Equals(file2));
+
+            Assert.IsTrue(file1 == file1);
+            Assert.IsTrue(file1 == file2);
+            Assert.IsTrue(file2 == file1);
 
             var file1AsObj = (object)file1;
             var file2AsObj = (object)file2;
@@ -114,6 +139,15 @@ namespace FutureNHS_WOPI_Host_UnitTests
             Assert.IsTrue(file2.Equals(file1AsObj));
             Assert.IsTrue(file2.Equals(file2AsObj));
 
+            // NB - File.Equals & Nullable<T>.Equals are actually object.Equals so no need to test them too
+
+            Assert.IsTrue(file1AsObj == file1AsObj);
+            Assert.IsFalse(file1AsObj == file2AsObj);               // Checks reference equality so will fail
+            Assert.IsFalse(file2AsObj == file1AsObj);               // Checks reference equality so will fail    
+            Assert.IsTrue(object.Equals(file1AsObj, file1AsObj));   // Checks value equality so should pass    
+            Assert.IsTrue(object.Equals(file1AsObj, file2AsObj));   // Checks value equality so should pass   
+            Assert.IsTrue(object.Equals(file2AsObj, file1AsObj));   // Checks value equality so should pass   
+
             var file1AsNullable = new File?(file1);
             var file2AsNullable = new File?(file2);
 
@@ -126,6 +160,10 @@ namespace FutureNHS_WOPI_Host_UnitTests
             Assert.IsTrue(file2.Equals(file2AsNullable));
             Assert.IsTrue(file2AsObj.Equals(file2AsNullable));
             Assert.IsTrue(file1AsNullable.Equals(file2AsNullable));
+
+            Assert.IsTrue(file1AsNullable == file1AsNullable);
+            Assert.IsTrue(file1AsNullable == file2AsNullable);
+            Assert.IsTrue(file2AsNullable == file1AsNullable);
         }
 
         [TestMethod]
@@ -136,10 +174,14 @@ namespace FutureNHS_WOPI_Host_UnitTests
 
             Assert.IsFalse(file1.Equals(new File()));
             Assert.IsFalse(file2.Equals(new File()));
-
             Assert.IsFalse(file1.Equals(file2));
             Assert.IsFalse(file2.Equals(file1));
-           
+
+            Assert.IsFalse(file1 == file2);
+            Assert.IsFalse(file2 == file1);
+            Assert.IsTrue(file1 != file2);
+            Assert.IsTrue(file2 != file1);
+
             var file1AsObj = (object)file1;
             var file2AsObj = (object)file2;
 
@@ -149,7 +191,15 @@ namespace FutureNHS_WOPI_Host_UnitTests
             Assert.IsFalse(file2.Equals(file1AsObj));
             Assert.IsFalse(file1AsObj.Equals(file2AsObj));
             Assert.IsFalse(file2.Equals(file1AsObj));
-           
+
+            Assert.IsFalse(object.Equals(file2, file1AsObj));
+            Assert.IsFalse(object.Equals(file1AsObj, file2AsObj));
+            Assert.IsFalse(object.Equals(file2, file1AsObj));
+
+            Assert.IsFalse(file1AsObj == file2AsObj);
+            Assert.IsTrue(file1AsObj != file2AsObj);
+            Assert.IsTrue(file2AsObj != file1AsObj);
+
             var file1AsNullable = new File?(file1);
             var file2AsNullable = new File?(file2);
 
@@ -159,7 +209,18 @@ namespace FutureNHS_WOPI_Host_UnitTests
             Assert.IsFalse(file2AsNullable.Equals(file1AsNullable));
             Assert.IsFalse(file2AsNullable.Equals(file1AsObj));
             Assert.IsFalse(file2AsNullable.Equals(file1));
+
+            Assert.IsFalse(file1.Equals(new File?()));
+            Assert.IsFalse(file2.Equals(new File?()));
+            Assert.IsFalse(file1AsObj.Equals(new File?()));
+            Assert.IsFalse(file2AsObj.Equals(new File?()));
+            Assert.IsFalse(file1AsNullable.Equals(new File?()));
+            Assert.IsFalse(file2AsNullable.Equals(new File?()));
+
+            Assert.IsTrue(file1AsNullable != file2AsNullable);
+            Assert.IsTrue(file2AsNullable != file1AsNullable);
         }
+
 
 
         [TestMethod]
@@ -194,5 +255,70 @@ namespace FutureNHS_WOPI_Host_UnitTests
             Assert.AreNotEqual(file1HashCode, file2HashCode);
         }
 
+
+
+        [TestMethod]
+        public void ImplictConvertToString_ReturnsNullWhenIsEmpty()
+        {
+            var empty = new File();
+
+            Assert.IsTrue(empty.IsEmpty);
+
+            var emptyAsString = (string)empty;
+
+            Assert.IsNull(emptyAsString);
+        }
+
+        [TestMethod]
+        public void ImplicitConvertToString_ReturnsIdWhenNotEmpty()
+        {
+            var notEmpty = File.With("file-name", "file-version");
+
+            var notEmptyAsString = (string)notEmpty;
+
+            var id = notEmpty.Id;
+
+            Assert.AreEqual(id, notEmptyAsString);
+        }
+
+        [TestMethod]
+        public void ImplicitConvertFromString_ReturnsEmptyWhenSourceIsNull()
+        {
+            var str = default(string);
+
+            var file = (File)str;
+
+            Assert.IsTrue(file.IsEmpty);
+        }
+
+        [TestMethod]
+        public void ImplicitConvertFromString_ReturnsEmptyWhenSourceIsEmpty()
+        {
+            var file = (File)string.Empty;
+
+            Assert.IsTrue(file.IsEmpty);
+        }
+
+        [TestMethod]
+        public void ImplicitConvertFromString_ReturnsEmptyWhenSourceNotParsable()
+        {
+            var str = "cannot-parse-me";
+
+            var file = (File)str;
+
+            Assert.IsTrue(file.IsEmpty);
+        }
+
+        [TestMethod]
+        public void ImplicitConvertFromString_ReturnsCorrectlyConstructedInstantWhenPresentedWithParsableStructure()
+        {
+            var str = "file-name|file-version";
+
+            var file = (File)str;
+
+            Assert.IsFalse(file.IsEmpty);
+
+            Assert.AreEqual(File.With("file-name", "file-version"), file);
+        }
     }
 }

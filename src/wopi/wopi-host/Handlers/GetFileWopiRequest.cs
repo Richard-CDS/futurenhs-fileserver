@@ -11,20 +11,17 @@ namespace FutureNHS.WOPIHost.Handlers
     internal sealed class GetFileWopiRequest
         : WopiRequest
     {
-        private readonly string _fileName;
-        private readonly string _fileVersion;
+        private readonly File _file;
 
-        private GetFileWopiRequest(string fileName, string fileVersion, string accessToken) 
+        private GetFileWopiRequest(File file, string accessToken) 
             : base(accessToken, isWriteAccessRequired: false) 
         {
-            if (string.IsNullOrWhiteSpace(fileName)) throw new ArgumentNullException(nameof(fileName));
-            if (string.IsNullOrWhiteSpace(fileVersion)) throw new ArgumentNullException(nameof(fileVersion));
+            if (file.IsEmpty) throw new ArgumentNullException(nameof(file));
 
-            _fileName = fileName;
-            _fileVersion = fileVersion;
+            _file = file;
         }
 
-        internal static GetFileWopiRequest With(string fileName, string fileVersion, string accessToken) => new GetFileWopiRequest(fileName, fileVersion, accessToken);
+        internal static GetFileWopiRequest With(File file, string accessToken) => new GetFileWopiRequest(file, accessToken);
 
         protected override async Task HandleAsyncImpl(HttpContext httpContext, CancellationToken cancellationToken)
         {
@@ -34,15 +31,10 @@ namespace FutureNHS.WOPIHost.Handlers
 
             var httpResponse = httpContext.Response;
 
-            // TODO - Get the item version from the metadata or use the blob version or etag to denote version number
-            //        we'll use this when the WOPI client posts back updates to ensure someone else hasn't changed the file
-            //        since it was opened for edit (assuming we don't implement a lock mechanism which we shouldn't as that 
-            //        potentially makes collaborative editing more difficult - assuming we crack the server affinity problem)
-            //
-            //        Check whether the version presented to the wopi client from the check file info endpoint is actually 
-            //        passed to this method and thus can be used by us to retrieve older versions
+            // NB - Collabora does not currently support the ItemVersion header but we'll add it here for completeness and hopefully
+            //      come back and use it once Collabora echoes it back to our CheckFileInfo endpoint (etc)
 
-            httpResponse.Headers.Add("X-WOPI-ItemVersion", _fileVersion);
+            httpResponse.Headers.Add("X-WOPI-ItemVersion", _file.Version);
 
             var responseStream = httpResponse.Body; 
 
@@ -54,7 +46,22 @@ namespace FutureNHS.WOPIHost.Handlers
 
             await httpResponse.StartAsync(cancellationToken);
 
-            await fileRepository.WriteToStreamAsync(_fileName, _fileVersion, responseStream, cancellationToken);
+            var fileWriteDetails = await fileRepository.WriteToStreamAsync(_file, responseStream, cancellationToken);
+
+            // TODO - Given we are writing direct to the response stream, is there a possibility that the wrong blob is sent to the client if the hash or version information 
+            //        of the blob used do not match with that of the blob we requested and thus expected?  Will throwing an exception after the event, result in some 
+            //        of the file being streamed (for larger files) before the response completes?  Need to test this thoroughly otherwise we may be at risk of sharing 
+            //        a file that the authenticated user is neither interested in, nor perhaps has the rights to access, or even worse, has been tampered with!
+
+            if (!string.Equals(fileWriteDetails.Version, _file.Version, StringComparison.OrdinalIgnoreCase)) throw new ApplicationException("The blob store client returned a version of the blob that does not match the version requested");
+
+            // Verify the hash stored in the database when the version was created is the same as the one of the file we just downloaded
+
+            var fileMetadata = await fileRepository.GetAsync(_file, cancellationToken);
+
+            if (fileMetadata.ContentHash != fileWriteDetails.ContentHash) throw new ApplicationException("The hash of the stored file does not match the has of the version downloaded from storage.  The file may have been tampered with and will not be returned to the requestor");
+
+            // Done reading, so make sure we are done writing too
 
             await responseStream.FlushAsync(cancellationToken);
         }

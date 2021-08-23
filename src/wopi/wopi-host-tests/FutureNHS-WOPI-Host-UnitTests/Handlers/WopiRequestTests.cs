@@ -24,7 +24,7 @@ namespace FutureNHS_WOPI_Host_UnitTests
             var httpRequest = httpContext.Request;
 
             httpRequest.Method = HttpMethods.Get;
-            httpRequest.Path = "/wopi/files/fileidgoeshere";
+            httpRequest.Path = "/wopi/files/file-name|file-version";
             httpRequest.QueryString = new QueryString("?access_token=<expired-access-token>");
 
             var wopiRequest = WopiRequest.EMPTY;
@@ -42,25 +42,25 @@ namespace FutureNHS_WOPI_Host_UnitTests
 
             var features = new Features();
 
-            var fileRepository = new Moq.Mock<IFileRepository>().Object;
-
             var snapshot = new Moq.Mock<IOptionsSnapshot<Features>>();
 
             snapshot.SetupGet(x => x.Value).Returns(features);
 
-            IWopiRequestFactory wopiRequestFactory = new WopiRequestFactory(fileRepository, features: snapshot.Object);
+            IWopiRequestFactory wopiRequestFactory = new WopiRequestFactory(features: snapshot.Object);
 
             var httpContext = new DefaultHttpContext();
 
             var httpRequest = httpContext.Request;
 
             httpRequest.Method = HttpMethods.Get;
-            httpRequest.Path = "/wopi/files/fileidgoeshere";
+            httpRequest.Path = "/wopi/files/file-name|file-version";
             httpRequest.QueryString = new QueryString("?access_token=<valid-access-token>");
 
             httpRequest.Headers["X-WOPI-ItemVersion"] = "file-version";
 
-            var wopiRequest = wopiRequestFactory.CreateRequest(request: httpContext.Request);
+            var createdOk = wopiRequestFactory.TryCreateRequest(request: httpContext.Request, out var wopiRequest);
+
+            Assert.IsTrue(createdOk);
 
             await wopiRequest.HandleAsync(httpContext, cts.Token);
         }
