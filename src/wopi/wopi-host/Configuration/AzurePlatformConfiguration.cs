@@ -6,6 +6,7 @@ namespace FutureNHS.WOPIHost.Configuration
     {
         public AzureBlobStorageConfiguration? AzureBlobStorage { get; set; }
         public AzureAppConfiguration? AzureAppConfiguration { get; set; }
+        public AzureSqlConfiguration? AzureSql { get; set; }
     }
 
     public sealed class AzureBlobStorageConfiguration
@@ -21,5 +22,11 @@ namespace FutureNHS.WOPIHost.Configuration
 
         public Uri? PrimaryServiceUrl { get; set; }
         public Uri? GeoRedundantServiceUrl { get; set; }
+    }
+
+    public sealed class AzureSqlConfiguration
+    {
+        public string? ReadWriteConnectionString { get; set; }
+        public string? ReadOnlyConnectionString { get; set; }
     }
 }

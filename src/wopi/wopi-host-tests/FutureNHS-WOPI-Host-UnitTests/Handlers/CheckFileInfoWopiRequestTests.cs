@@ -53,9 +53,11 @@ namespace FutureNHS_WOPI_Host_UnitTests.Handlers
                 owner: owner, 
                 name: fileName, 
                 extension: extension,
+                blobName: fileName,
                 sizeInBytes: sizeInBytes,
                 lastWriteTime: DateTimeOffset.UtcNow, 
-                contentHash: contentHash
+                contentHash: contentHash, 
+                fileStatus: FileStatus.Verified
                 );
 
             fileRepository.

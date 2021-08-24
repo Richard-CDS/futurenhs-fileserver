@@ -72,7 +72,22 @@ namespace FutureNHS.WOPIHost
 
                     return new AzureBlobStoreClient(config.PrimaryServiceUrl, config.GeoRedundantServiceUrl, logger);
                 });
+
+            services.AddScoped(
+                sp => {
+                    var config = sp.GetRequiredService<IOptionsSnapshot<AzurePlatformConfiguration>>().Value.AzureSql;
+
+                    if (config is null) throw new ApplicationException("Unable to load the azure sql configuration");
+                    if (string.IsNullOrWhiteSpace(config.ReadWriteConnectionString)) throw new ApplicationException("The azure read write connection string is missing from the files configuration section");
+                    if (string.IsNullOrWhiteSpace(config.ReadOnlyConnectionString)) throw new ApplicationException("The azure read only connection string is missing from the files configuration section");
+ 
+                    var logger = sp.GetRequiredService<ILogger<AzureSqlClient>>();
+
+                    return new AzureSqlClient(config.ReadWriteConnectionString, config.ReadOnlyConnectionString, logger);
+                    });
+
             services.AddScoped<IAzureBlobStoreClient>(sp => sp.GetRequiredService<AzureBlobStoreClient>());
+            services.AddScoped<IAzureSqlClient>(sp => sp.GetRequiredService<AzureSqlClient>());
 
             services.AddScoped<FileRepository>();
             services.AddScoped<IFileRepository>(sp => sp.GetRequiredService<FileRepository>());
@@ -159,7 +174,7 @@ namespace FutureNHS.WOPIHost
         {
             httpContext.Response.StatusCode = StatusCodes.Status200OK;
 
-            // TODO - Remove all the private information that's included at the moment to make it easier to debug
+            // TODO - Remove all the private information that's included at the moment to make it easier to debug,
             //        and replace with something more appropriate/informative to public consumers
 
             var sb = new StringBuilder();
@@ -189,6 +204,9 @@ namespace FutureNHS.WOPIHost
             sb.AppendLine($"      AzurePlatform:AzureBlobStorage:PrimaryServiceUrl = { azureConfig.AzureBlobStorage?.PrimaryServiceUrl }</br>");
             sb.AppendLine($"      AzurePlatform:AzureBlobStorage:GeoRedundantServiceUrl = { azureConfig.AzureBlobStorage?.GeoRedundantServiceUrl }</br>");
             sb.AppendLine($"      AzurePlatform:AzureBlobStorage:ContainerName = { azureConfig.AzureBlobStorage?.ContainerName }</br>");
+            sb.AppendLine($"      <br/>");
+            sb.AppendLine($"      AzurePlatform:AzureSql:ReadWriteConnectionString = { azureConfig.AzureSql?.ReadWriteConnectionString }</br>");
+            sb.AppendLine($"      AzurePlatform:AzureSql:ReadOnlyConnectionString = { azureConfig.AzureSql?.ReadOnlyConnectionString }</br>");
             sb.AppendLine($"      <br/>");
             sb.AppendLine($"      Wopi:ClientDiscoveryDocumentUrl = { wopiConfig.ClientDiscoveryDocumentUrl }</br>");
             sb.AppendLine($"      Wopi:HostFilesUrl = { wopiConfig.HostFilesUrl }</br>");
@@ -225,7 +243,7 @@ namespace FutureNHS.WOPIHost
 
             var fileId = httpContext.Request.Query["file_id"].FirstOrDefault()?.Trim();
 
-            if (string.IsNullOrWhiteSpace(fileId)) fileId = "Excel-Spreadsheet.xlsx";
+            if (string.IsNullOrWhiteSpace(fileId)) fileId = File.With("DF796179-DB2F-4A06-B4D5-AD7F012CC2CC", "2021-08-09T18:15:02.4214747Z");
 
             var wopiConfiguration = httpContext.RequestServices.GetRequiredService<IOptionsSnapshot<WopiConfiguration>>().Value;
 
@@ -234,8 +252,12 @@ namespace FutureNHS.WOPIHost
             if (string.IsNullOrWhiteSpace(hostFilesUrl)) return;
 
             var wopiHostFileEndpointUrl = new Uri(Path.Combine(hostFilesUrl, fileId), UriKind.Absolute);
-            
-            var fileExtension = Path.GetExtension(fileId);
+
+            var fileRepository = httpContext.RequestServices.GetRequiredService<IFileRepository>();
+
+            var fileMetadata = await fileRepository.GetAsync(fileId, cancellationToken);
+
+            var fileExtension = fileMetadata.Extension;
 
             if (string.IsNullOrWhiteSpace(fileExtension)) return;  // TODO - Return appropriate status code to caller
 

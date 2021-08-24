@@ -3,7 +3,11 @@ using FutureNHS.WOPIHost.PlatformHelpers;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using System;
+using System.Data;
+using System.Data.SqlClient;
+using System.Diagnostics;
 using System.IO;
+using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -32,23 +36,25 @@ namespace FutureNHS.WOPIHost
     public sealed class FileRepository : IFileRepository
     {
         private readonly IAzureBlobStoreClient _azureBlobStoreClient;
+        private readonly IAzureSqlClient _azureSqlClient;
         private readonly ILogger<FileRepository>? _logger;
 
-        private readonly string _containerName;
+        private readonly string _blobContainerName;
 
-        public FileRepository(IAzureBlobStoreClient azureBlobStoreClient, IOptionsSnapshot<AzurePlatformConfiguration> azurePlatformConfiguration, ILogger<FileRepository>? logger)
+        public FileRepository(IAzureBlobStoreClient azureBlobStoreClient, IAzureSqlClient azureSqlClient, IOptionsSnapshot<AzurePlatformConfiguration> azurePlatformConfiguration, ILogger<FileRepository>? logger)
         {
             _logger = logger;
 
             _azureBlobStoreClient = azureBlobStoreClient ?? throw new ArgumentNullException(nameof(azureBlobStoreClient));
-            
+            _azureSqlClient = azureSqlClient             ?? throw new ArgumentNullException(nameof(azureSqlClient));
+
             if (azurePlatformConfiguration?.Value is null) throw new ArgumentNullException(nameof(azurePlatformConfiguration));
 
-            var containerName = azurePlatformConfiguration.Value.AzureBlobStorage?.ContainerName;
+            var blobContainerName = azurePlatformConfiguration.Value.AzureBlobStorage?.ContainerName;
 
-            if (string.IsNullOrWhiteSpace(containerName)) throw new ApplicationException("The files container name is not set in the configuration");
+            if (string.IsNullOrWhiteSpace(blobContainerName)) throw new ApplicationException("The files blob container name is not set in the configuration");
 
-            _containerName = containerName;
+            _blobContainerName = blobContainerName;
         }
 
         async Task<FileMetadata> IFileRepository.GetAsync(File file, CancellationToken cancellationToken)
@@ -57,9 +63,30 @@ namespace FutureNHS.WOPIHost
 
             cancellationToken.ThrowIfCancellationRequested();
 
-            // TODO - Implement properly
+            // TODO - Implement properly and defer to a SQL client to do the heavy lifting
 
-            return new FileMetadata("file-title", "file-description", file.Version, "file-owner", file.Name, "file-extension", 999, DateTimeOffset.UtcNow.AddDays(-1), "content-hash");
+            var sb = new StringBuilder();
+
+            sb.AppendLine($"SELECT   [Title]           = a.[Title]");
+            sb.AppendLine($"       , [Description]     = a.[Description]");
+            sb.AppendLine($"       , [Name]            = a.[FileName]");
+            sb.AppendLine($"       , [Version]         = @FileVersion");            // TODO - Wire up when in database
+            sb.AppendLine($"       , [SizeInBytes]     = a.[FileSize]");            // TODO - to be renamed in database
+            sb.AppendLine($"       , [Extension]       = a.[FileExtension]");
+            sb.AppendLine($"       , [BlobName]        = a.[FileUrl]");             // TODO - to be renamed in database
+            sb.AppendLine($"       , [FileContentHash] = @FileContentHash");        // TODO - Wire up when in database
+            sb.AppendLine($"       , [LastWriteTime]   = CONVERT(DATETIMEOFFSET, ISNULL(a.[ModifiedDate], a.[CreatedDate]))"); // TODO - DB data type needs changing to datetimeoffset, or datetime2 with renamed to suffix UTC so we know what it contains
+            sb.AppendLine($"       , [FileStatus]      = a.[UploadStatus]");        // TODO - Earmarked to be renamed in DB to FileStatus
+            sb.AppendLine($"       , [Owner]           = b.[UserName]");
+            sb.AppendLine($"FROM   dbo.[File] a");
+            sb.AppendLine($"JOIN   dbo.[MembershipUser] b ON b.[Id] = a.[CreatedBy]");
+            sb.AppendLine($"WHERE  a.[Id] = @Id");
+
+            var parameters = new { Id = file.Name, FileVersion = file.Version, FileContentHash = "replace-with-hash-code-soon" };
+
+            var fileMetadata = await _azureSqlClient.GetRecord<FileMetadata>(sb.ToString(), parameters, cancellationToken);
+
+            return fileMetadata;
         }
 
         async Task<FileWriteDetails> IFileRepository.WriteToStreamAsync(File file, Stream streamToWriteTo, CancellationToken cancellationToken)
@@ -68,7 +95,14 @@ namespace FutureNHS.WOPIHost
 
             if (file.IsEmpty) throw new ArgumentNullException(nameof(file));
 
-            var downloadDetails = await _azureBlobStoreClient.FetchBlobAndWriteToStream(_containerName, file.Name, file.Version, streamToWriteTo, cancellationToken);
+            var fileMetadata = await ((IFileRepository)this).GetAsync(file, cancellationToken);
+
+            if (fileMetadata.IsEmpty) return FileWriteDetails.EMPTY;
+
+            Debug.Assert(!string.IsNullOrWhiteSpace(fileMetadata.BlobName));
+            Debug.Assert(!string.IsNullOrWhiteSpace(fileMetadata.Version));
+
+            var downloadDetails = await _azureBlobStoreClient.FetchBlobAndWriteToStream(_blobContainerName, fileMetadata.BlobName, fileMetadata.Version, streamToWriteTo, cancellationToken);
 
             return new FileWriteDetails(
                 version: downloadDetails.VersionId,

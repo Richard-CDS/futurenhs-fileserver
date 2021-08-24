@@ -126,7 +126,7 @@ namespace FutureNHS_WOPI_Host_UnitTests.Handlers
                 }).
                 Returns(Task.FromResult(fileWriteDetails));
 
-            var fileMetadata = new FileMetadata("title", "description", fileVersion, "owner", fileName, fileInfo.Extension, (ulong)fileBuffer.Length, fileInfo.LastWriteTimeUtc, Convert.ToBase64String(contentHash));
+            var fileMetadata = new FileMetadata("title", "description", fileVersion, "owner", fileName, fileInfo.Extension, (ulong)fileBuffer.Length, "blob-name-goes-here", fileInfo.LastWriteTimeUtc, Convert.ToBase64String(contentHash), FileStatus.Verified);
 
             fileRepository.Setup(x => x.GetAsync(Moq.It.IsAny<File>(), Moq.It.IsAny<CancellationToken>())).Returns(Task.FromResult(fileMetadata));
 

@@ -1,0 +1,105 @@
+﻿using Dapper;
+using Microsoft.EntityFrameworkCore.SqlServer.Storage.Internal;
+using Microsoft.Extensions.Logging;
+using Polly;
+using Polly.Timeout;
+using Polly.Wrap;
+using System;
+using System.ComponentModel;
+using System.Data.SqlClient;
+using System.Diagnostics.CodeAnalysis;
+using System.Threading;
+using System.Threading.Tasks;
+
+namespace FutureNHS.WOPIHost.PlatformHelpers
+{
+    public interface IAzureSqlClient
+    {
+        Task<T> GetRecord<T>(string sqlQuery, object parameters, CancellationToken cancellationToken) where T : class;
+    }
+
+    public sealed class AzureSqlClient : IAzureSqlClient
+    {
+        private static AsyncPolicyWrap _globalResiliencyPolicy = GetAsyncGlobalResiliencyPolicy();
+
+        private readonly string _readWriteConnectionString;
+        private readonly string _readOnlyConnectionString;
+        private readonly ILogger<AzureSqlClient>? _logger;
+
+        public AzureSqlClient(string readWriteConnectionString, string readOnlyConnectionString, ILogger<AzureSqlClient>? logger)
+        {
+            if (string.IsNullOrWhiteSpace(readWriteConnectionString)) throw new ArgumentNullException(nameof(readWriteConnectionString));
+            if (string.IsNullOrWhiteSpace(readOnlyConnectionString)) throw new ArgumentNullException(nameof(readOnlyConnectionString));
+
+            _logger = logger;
+
+            _readWriteConnectionString = readWriteConnectionString;
+            _readOnlyConnectionString = readOnlyConnectionString;
+        }
+
+        async Task<T> IAzureSqlClient.GetRecord<T>(string sqlQuery, object parameters, CancellationToken cancellationToken)
+            where T : class
+        {
+            using var sqlConnection = new SqlConnection(_readOnlyConnectionString);
+
+            var cmd = new CommandDefinition(sqlQuery, parameters, cancellationToken: cancellationToken);
+
+            var retryPolicy = GetAsyncRetryPolicy();
+
+            var resiliencyPolicy = Policy.WrapAsync(retryPolicy, _globalResiliencyPolicy);
+
+            var record = await resiliencyPolicy.ExecuteAsync(() => sqlConnection.QuerySingleAsync<T>(cmd));
+
+            return record;
+        }
+
+        [SuppressMessage("Usage", "EF1001:Internal EF Core API usage.", Justification = "Understand this is an internal API and risks of future incompatibility")]
+#if DEBUG
+        internal
+#else
+        private
+#endif
+            static AsyncPolicyWrap GetAsyncGlobalResiliencyPolicy()
+        {
+            var bulkheadPolicy = Policy.BulkheadAsync(maxParallelization: 3, maxQueuingActions: 25);
+
+            var circuitBreakerPolicy =
+                Policy.Handle<SqlException>(SqlServerTransientExceptionDetector.ShouldRetryOn).
+                       Or<TimeoutException>().
+                       Or<TimeoutRejectedException>().
+                       OrInner<Win32Exception>(SqlServerTransientExceptionDetector.ShouldRetryOn).
+                       AdvancedCircuitBreakerAsync(
+                          failureThreshold: 0.25,                             // If 25% or more of requests fail
+                          samplingDuration: TimeSpan.FromSeconds(60),         // in a 60 second period
+                          minimumThroughput: 7,                               // and there have been at least 7 requests in that time
+                          durationOfBreak: TimeSpan.FromSeconds(30)           // then open the circuit for 30 seconds
+                          );
+
+            return Policy.WrapAsync(circuitBreakerPolicy, bulkheadPolicy);
+        }
+
+        [SuppressMessage("Usage", "EF1001:Internal EF Core API usage.", Justification = "Understand this is an internal API and risks of future incompatibility")]
+        private AsyncPolicy GetAsyncRetryPolicy()
+        {
+            const int RETRY_ATTEMPTS_ON_TRANSIENT_ERROR = 5;
+
+            var jitterer = new Random();
+
+            var retryPolicyWithJitter =
+                Policy.Handle<SqlException>(SqlServerTransientExceptionDetector.ShouldRetryOn).
+                       Or<TimeoutException>().
+                       Or<TimeoutRejectedException>().
+                       OrInner<Win32Exception>(SqlServerTransientExceptionDetector.ShouldRetryOn).
+                       WaitAndRetryAsync(
+                          retryCount: RETRY_ATTEMPTS_ON_TRANSIENT_ERROR,
+                          sleepDurationProvider: retryNumber => TimeSpan.FromSeconds(Math.Pow(2, retryNumber)) + TimeSpan.FromMilliseconds(jitterer.Next(0, 100)),
+                          (ex, sleepingFor, retryNumber, ctxt) =>
+                          {
+                              _logger?.LogTrace($"Azure SQL Retry handler on iteration {retryNumber} sleeping {sleepingFor.TotalMilliseconds} ms after error '{ex.Message}' against context {ctxt.CorrelationId}");
+                          }
+                      );
+
+            return retryPolicyWithJitter;
+        }
+    }
+}

@@ -4,6 +4,10 @@ namespace FutureNHS.WOPIHost
 {
     public sealed class FileWriteDetails
     {
+        public static FileWriteDetails EMPTY = new FileWriteDetails();
+
+        private FileWriteDetails() { }
+
         public FileWriteDetails(string version, string contentType, byte[] contentHash, ulong contentLength, string? contentEncoding, string? contentLanguage, DateTimeOffset? lastAccessed, DateTimeOffset lastModified)
         {
             if (string.IsNullOrWhiteSpace(version)) throw new ArgumentNullException(nameof(version));
@@ -22,10 +26,12 @@ namespace FutureNHS.WOPIHost
             ContentHash = Convert.ToBase64String(contentHash);
         }
 
-        public string Version { get; }
-        public string ContentType { get; }
-        public string ContentHash { get; }
-        public ulong ContentLength { get; }
+        public bool IsEmpty => ReferenceEquals(this, EMPTY);
+
+        public string? Version { get; }
+        public string? ContentType { get; }
+        public string? ContentHash { get; }
+        public ulong? ContentLength { get; }
         public string? ContentEncoding { get; }
         public string? ContentLanguage { get; }
         public DateTimeOffset? LastAccessed { get; }

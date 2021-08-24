@@ -5,6 +5,8 @@
     <RootNamespace>FutureNHS_WOPI_Host_UnitTests</RootNamespace>
 
     <IsPackable>false</IsPackable>
+
+    <UserSecretsId>c0cb6557-ddb1-478e-b554-1e175843c192</UserSecretsId>
   </PropertyGroup>
 
   <ItemGroup>
@@ -28,6 +30,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <PackageReference Include="Microsoft.Extensions.Configuration.UserSecrets" Version="3.1.0" />
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="16.5.0" />
     <PackageReference Include="Moq" Version="4.16.1" />
     <PackageReference Include="MSTest.TestAdapter" Version="2.1.0" />

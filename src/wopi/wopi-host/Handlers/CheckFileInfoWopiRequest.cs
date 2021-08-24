@@ -43,6 +43,10 @@ namespace FutureNHS.WOPIHost.Handlers
 
             var fileMetadata = await fileRepository.GetAsync(_file, cancellationToken);
 
+            if (fileMetadata.IsEmpty) throw new ApplicationException("The file metadata could not be found.  Please ensure the file is known to the application, or wait a few minutes for any database synchronisation activities to complete.  Alternatively report the issue to our support team so we can investigate if data has been lost as a result of a recent database restore operation.");
+
+            if (FileStatus.Verified != fileMetadata.FileStatus) throw new ApplicationException($"The status of the file '{fileMetadata.FileStatus}' does not indicate it is yet safe to be shared with users.");
+
             // TODO - Get user context from the authenticated user
 
 
@@ -143,12 +147,12 @@ namespace FutureNHS.WOPIHost.Handlers
             responseBody.DisableExport = false;
             responseBody.DisableCopy = false;
             responseBody.EnableOwnerTermination = false;
-            
+
+            context.Response.ContentType = "application/json";
+
             await context.Response.StartAsync();
 
             await System.Text.Json.JsonSerializer.SerializeAsync(context.Response.Body, responseBody, cancellationToken: cancellationToken);
-
-            context.Response.ContentType = "application/json";
         }
     }
 }

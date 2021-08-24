@@ -48,6 +48,8 @@ namespace FutureNHS.WOPIHost.Handlers
 
             var fileWriteDetails = await fileRepository.WriteToStreamAsync(_file, responseStream, cancellationToken);
 
+            if (fileWriteDetails.IsEmpty) throw new ApplicationException("Unable to load metadata for the requested file and version");
+
             // TODO - Given we are writing direct to the response stream, is there a possibility that the wrong blob is sent to the client if the hash or version information 
             //        of the blob used do not match with that of the blob we requested and thus expected?  Will throwing an exception after the event, result in some 
             //        of the file being streamed (for larger files) before the response completes?  Need to test this thoroughly otherwise we may be at risk of sharing 
@@ -58,6 +60,10 @@ namespace FutureNHS.WOPIHost.Handlers
             // Verify the hash stored in the database when the version was created is the same as the one of the file we just downloaded
 
             var fileMetadata = await fileRepository.GetAsync(_file, cancellationToken);
+
+            if (fileMetadata.IsEmpty) throw new ApplicationException("The file metadata could not be found for a file that has been located in storage.  Please ensure the file is known to the application, or wait a few minutes for any database synchronisation activities to complete.  Alternatively report the issue to our support team so we can investigate if data has been lost as a result of a recent database restore operation.");
+
+            if (FileStatus.Verified != fileMetadata.FileStatus) throw new ApplicationException($"The status of the file '{fileMetadata.FileStatus}' does not indicate it is safe to be shared with users.");
 
             if (fileMetadata.ContentHash != fileWriteDetails.ContentHash) throw new ApplicationException("The hash of the stored file does not match the has of the version downloaded from storage.  The file may have been tampered with and will not be returned to the requestor");
 
