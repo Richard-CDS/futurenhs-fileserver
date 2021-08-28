@@ -61,7 +61,7 @@ namespace FutureNHS_WOPI_Host_UnitTests.Handlers
                 );
 
             fileRepository.
-                Setup(x => x.GetAsync(Moq.It.IsAny<FutureNHS.WOPIHost.File>(), Moq.It.IsAny<CancellationToken>())).
+                Setup(x => x.GetMetadataAsync(Moq.It.IsAny<FutureNHS.WOPIHost.File>(), Moq.It.IsAny<CancellationToken>())).
                 Callback((FutureNHS.WOPIHost.File givenFile, CancellationToken givenCancellationToken) => {
 
                     Assert.IsFalse(givenFile.IsEmpty);

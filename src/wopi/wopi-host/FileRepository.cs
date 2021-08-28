@@ -30,7 +30,7 @@ namespace FutureNHS.WOPIHost
         /// <param name="file">The details of the file and version for which the extended metadata is being requested</param>
         /// <param name="cancellationToken"></param>
         /// <returns>The requested metadata in the success case</returns>
-        Task<FileMetadata> GetAsync(File file, CancellationToken cancellationToken);
+        Task<FileMetadata> GetMetadataAsync(File file, CancellationToken cancellationToken);
     }
 
     public sealed class FileRepository : IFileRepository
@@ -57,7 +57,7 @@ namespace FutureNHS.WOPIHost
             _blobContainerName = blobContainerName;
         }
 
-        async Task<FileMetadata> IFileRepository.GetAsync(File file, CancellationToken cancellationToken)
+        async Task<FileMetadata> IFileRepository.GetMetadataAsync(File file, CancellationToken cancellationToken)
         {
             if (file.IsEmpty) throw new ArgumentNullException(nameof(file));
 
@@ -95,7 +95,7 @@ namespace FutureNHS.WOPIHost
 
             if (file.IsEmpty) throw new ArgumentNullException(nameof(file));
 
-            var fileMetadata = await ((IFileRepository)this).GetAsync(file, cancellationToken);
+            var fileMetadata = await ((IFileRepository)this).GetMetadataAsync(file, cancellationToken);
 
             if (fileMetadata.IsEmpty) return FileWriteDetails.EMPTY;
 
@@ -112,7 +112,8 @@ namespace FutureNHS.WOPIHost
                 contentType: downloadDetails.ContentType,
                 contentLength: 0 > downloadDetails.ContentLength ? 0 : (ulong)downloadDetails.ContentLength,
                 lastAccessed: DateTimeOffset.MinValue == downloadDetails.LastAccessed ? default : downloadDetails.LastAccessed,
-                lastModified: downloadDetails.LastModified
+                lastModified: downloadDetails.LastModified,
+                fileMetadata: fileMetadata
                 );
         }
     }

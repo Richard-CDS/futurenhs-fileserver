@@ -58,7 +58,7 @@ namespace FutureNHS.WOPIHost
 
             services.AddSingleton<ISystemClock>(new SystemClock());
 
-            services.AddScoped<RetryHandler>();
+            services.AddScoped<CoreResilientRetryHandler>();
 
             services.AddScoped(
                 sp => {
@@ -255,7 +255,7 @@ namespace FutureNHS.WOPIHost
 
             var fileRepository = httpContext.RequestServices.GetRequiredService<IFileRepository>();
 
-            var fileMetadata = await fileRepository.GetAsync(fileId, cancellationToken);
+            var fileMetadata = await fileRepository.GetMetadataAsync(fileId, cancellationToken);
 
             var fileExtension = fileMetadata.Extension;
 

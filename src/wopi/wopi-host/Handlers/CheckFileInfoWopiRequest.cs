@@ -41,7 +41,7 @@ namespace FutureNHS.WOPIHost.Handlers
             
             var fileRepository = context.RequestServices.GetRequiredService<IFileRepository>();
 
-            var fileMetadata = await fileRepository.GetAsync(_file, cancellationToken);
+            var fileMetadata = await fileRepository.GetMetadataAsync(_file, cancellationToken);
 
             if (fileMetadata.IsEmpty) throw new ApplicationException("The file metadata could not be found.  Please ensure the file is known to the application, or wait a few minutes for any database synchronisation activities to complete.  Alternatively report the issue to our support team so we can investigate if data has been lost as a result of a recent database restore operation.");
 

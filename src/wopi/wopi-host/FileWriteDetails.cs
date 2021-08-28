@@ -8,7 +8,7 @@ namespace FutureNHS.WOPIHost
 
         private FileWriteDetails() { }
 
-        public FileWriteDetails(string version, string contentType, byte[] contentHash, ulong contentLength, string? contentEncoding, string? contentLanguage, DateTimeOffset? lastAccessed, DateTimeOffset lastModified)
+        public FileWriteDetails(string version, string contentType, byte[] contentHash, ulong contentLength, string? contentEncoding, string? contentLanguage, DateTimeOffset? lastAccessed, DateTimeOffset lastModified, FileMetadata fileMetadata)
         {
             if (string.IsNullOrWhiteSpace(version)) throw new ArgumentNullException(nameof(version));
             if (string.IsNullOrWhiteSpace(contentType)) throw new ArgumentNullException(nameof(contentType));
@@ -24,9 +24,13 @@ namespace FutureNHS.WOPIHost
             LastModified = lastModified;
 
             ContentHash = Convert.ToBase64String(contentHash);
+
+            FileMetadata = fileMetadata ?? throw new ArgumentNullException(nameof(fileMetadata));
         }
 
         public bool IsEmpty => ReferenceEquals(this, EMPTY);
+
+        public FileMetadata FileMetadata { get; }
 
         public string? Version { get; }
         public string? ContentType { get; }

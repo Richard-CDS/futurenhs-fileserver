@@ -59,7 +59,7 @@ namespace FutureNHS.WOPIHost.Handlers
 
             // Verify the hash stored in the database when the version was created is the same as the one of the file we just downloaded
 
-            var fileMetadata = await fileRepository.GetAsync(_file, cancellationToken);
+            var fileMetadata = fileWriteDetails.FileMetadata;
 
             if (fileMetadata.IsEmpty) throw new ApplicationException("The file metadata could not be found for a file that has been located in storage.  Please ensure the file is known to the application, or wait a few minutes for any database synchronisation activities to complete.  Alternatively report the issue to our support team so we can investigate if data has been lost as a result of a recent database restore operation.");
 

@@ -103,7 +103,9 @@ namespace FutureNHS_WOPI_Host_UnitTests.Handlers
 
             var contentHash = algo.ComputeHash(fileBuffer);
 
-            var fileWriteDetails = new FileWriteDetails(fileVersion, "content-type", contentHash, (ulong)fileBuffer.Length, "content-encoding", "content-language", DateTimeOffset.UtcNow, DateTimeOffset.UtcNow);
+            var fileMetadata = new FileMetadata("tile", "description", "version", "owner", "name", "extension", 1, "blobName", DateTimeOffset.UtcNow, Convert.ToBase64String(contentHash), FileStatus.Verified);
+
+            var fileWriteDetails = new FileWriteDetails(fileVersion, "content-type", contentHash, (ulong)fileBuffer.Length, "content-encoding", "content-language", DateTimeOffset.UtcNow, DateTimeOffset.UtcNow, fileMetadata);
 
             fileRepository.
                 Setup(x => x.WriteToStreamAsync(Moq.It.IsAny<File>(), Moq.It.IsAny<Stream>(), Moq.It.IsAny<CancellationToken>())).
@@ -126,9 +128,7 @@ namespace FutureNHS_WOPI_Host_UnitTests.Handlers
                 }).
                 Returns(Task.FromResult(fileWriteDetails));
 
-            var fileMetadata = new FileMetadata("title", "description", fileVersion, "owner", fileName, fileInfo.Extension, (ulong)fileBuffer.Length, "blob-name-goes-here", fileInfo.LastWriteTimeUtc, Convert.ToBase64String(contentHash), FileStatus.Verified);
-
-            fileRepository.Setup(x => x.GetAsync(Moq.It.IsAny<File>(), Moq.It.IsAny<CancellationToken>())).Returns(Task.FromResult(fileMetadata));
+            fileRepository.Setup(x => x.GetMetadataAsync(Moq.It.IsAny<File>(), Moq.It.IsAny<CancellationToken>())).Returns(Task.FromResult(fileMetadata));
 
             var accessToken = Guid.NewGuid().ToString();
 

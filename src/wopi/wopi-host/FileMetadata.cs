@@ -3,15 +3,12 @@ using System.Globalization;
 
 namespace FutureNHS.WOPIHost
 {
-    public enum FileStatus: UInt16
+    public enum FileStatus: ushort
     {
         Uploading = 1, 
         Uploaded = 2,
         Failed = 3,
         Verified = 4,
-        Quarantined = 5,
-        Recycled = 6,
-        Deleted = 7
     }
 
     public sealed class FileMetadata

@@ -5,6 +5,7 @@ using Polly;
 using Polly.Timeout;
 using Polly.Wrap;
 using System;
+using System.Collections.Concurrent;
 using System.ComponentModel;
 using System.Data.SqlClient;
 using System.Diagnostics.CodeAnalysis;
@@ -20,7 +21,7 @@ namespace FutureNHS.WOPIHost.PlatformHelpers
 
     public sealed class AzureSqlClient : IAzureSqlClient
     {
-        private static AsyncPolicyWrap _globalResiliencyPolicy = GetAsyncGlobalResiliencyPolicy();
+        private readonly static ConcurrentDictionary<string, AsyncPolicyWrap> _globalPolicies = new ConcurrentDictionary<string, AsyncPolicyWrap>();
 
         private readonly string _readWriteConnectionString;
         private readonly string _readOnlyConnectionString;
@@ -40,17 +41,45 @@ namespace FutureNHS.WOPIHost.PlatformHelpers
         async Task<T> IAzureSqlClient.GetRecord<T>(string sqlQuery, object parameters, CancellationToken cancellationToken)
             where T : class
         {
+            if (string.IsNullOrWhiteSpace(sqlQuery)) throw new ArgumentNullException(nameof(sqlQuery));
+
+            cancellationToken.ThrowIfCancellationRequested();
+
             using var sqlConnection = new SqlConnection(_readOnlyConnectionString);
 
             var cmd = new CommandDefinition(sqlQuery, parameters, cancellationToken: cancellationToken);
 
             var retryPolicy = GetAsyncRetryPolicy();
 
-            var resiliencyPolicy = Policy.WrapAsync(retryPolicy, _globalResiliencyPolicy);
+            var globalResiliencyPolicy = GetAsyncGlobalResiliencyPolicyFor(_readOnlyConnectionString);
 
-            var record = await resiliencyPolicy.ExecuteAsync(() => sqlConnection.QuerySingleAsync<T>(cmd));
+            var resiliencyPolicy = Policy.WrapAsync(retryPolicy, globalResiliencyPolicy);
+
+            var record = await resiliencyPolicy.ExecuteAsync(ct => sqlConnection.QuerySingleAsync<T>(cmd), cancellationToken);
 
             return record;
+        }
+
+
+        [SuppressMessage("Usage", "EF1001:Internal EF Core API usage.", Justification = "Understand this is an internal API and risks of future incompatibility")]
+#if DEBUG
+        internal
+#else
+        private
+#endif
+            static AsyncPolicyWrap GetAsyncGlobalResiliencyPolicyFor(string policyKey)
+        {
+            if (_globalPolicies.TryGetValue(policyKey, out var cachedPolicy)) return cachedPolicy;
+
+            var bulkheadPolicy = GetAsyncBulkheadPolicy();
+
+            var circuitBreakerPolicy = GetAsyncCircuitBreakerPolicy();
+
+            var newPolicy = Policy.WrapAsync(bulkheadPolicy, circuitBreakerPolicy);
+
+            _globalPolicies.AddOrUpdate(policyKey, newPolicy, (_, oldPolicy) => newPolicy = oldPolicy);
+
+            return newPolicy;
         }
 
         [SuppressMessage("Usage", "EF1001:Internal EF Core API usage.", Justification = "Understand this is an internal API and risks of future incompatibility")]
@@ -59,27 +88,7 @@ namespace FutureNHS.WOPIHost.PlatformHelpers
 #else
         private
 #endif
-            static AsyncPolicyWrap GetAsyncGlobalResiliencyPolicy()
-        {
-            var bulkheadPolicy = Policy.BulkheadAsync(maxParallelization: 3, maxQueuingActions: 25);
-
-            var circuitBreakerPolicy =
-                Policy.Handle<SqlException>(SqlServerTransientExceptionDetector.ShouldRetryOn).
-                       Or<TimeoutException>().
-                       Or<TimeoutRejectedException>().
-                       OrInner<Win32Exception>(SqlServerTransientExceptionDetector.ShouldRetryOn).
-                       AdvancedCircuitBreakerAsync(
-                          failureThreshold: 0.25,                             // If 25% or more of requests fail
-                          samplingDuration: TimeSpan.FromSeconds(60),         // in a 60 second period
-                          minimumThroughput: 7,                               // and there have been at least 7 requests in that time
-                          durationOfBreak: TimeSpan.FromSeconds(30)           // then open the circuit for 30 seconds
-                          );
-
-            return Policy.WrapAsync(circuitBreakerPolicy, bulkheadPolicy);
-        }
-
-        [SuppressMessage("Usage", "EF1001:Internal EF Core API usage.", Justification = "Understand this is an internal API and risks of future incompatibility")]
-        private AsyncPolicy GetAsyncRetryPolicy()
+        AsyncPolicy GetAsyncRetryPolicy()
         {
             const int RETRY_ATTEMPTS_ON_TRANSIENT_ERROR = 5;
 
@@ -101,5 +110,29 @@ namespace FutureNHS.WOPIHost.PlatformHelpers
 
             return retryPolicyWithJitter;
         }
+
+#if DEBUG
+        internal
+#else
+        private
+#endif
+        static AsyncPolicy GetAsyncBulkheadPolicy() => Policy.BulkheadAsync(maxParallelization: 3, maxQueuingActions: 25);
+
+#if DEBUG
+        internal
+#else
+        private
+#endif
+        static AsyncPolicy GetAsyncCircuitBreakerPolicy() => 
+            Policy.Handle<SqlException>(SqlServerTransientExceptionDetector.ShouldRetryOn).
+                   Or<TimeoutException>().
+                   Or<TimeoutRejectedException>().
+                   OrInner<Win32Exception>(SqlServerTransientExceptionDetector.ShouldRetryOn).
+                   AdvancedCircuitBreakerAsync(
+                      failureThreshold: 0.25,                             // If 25% or more of requests fail
+                      samplingDuration: TimeSpan.FromSeconds(60),         // in a 60 second period
+                      minimumThroughput: 7,                               // and there have been at least 7 requests in that time
+                      durationOfBreak: TimeSpan.FromSeconds(30)           // then open the circuit for 30 seconds
+                      );
     }
 }

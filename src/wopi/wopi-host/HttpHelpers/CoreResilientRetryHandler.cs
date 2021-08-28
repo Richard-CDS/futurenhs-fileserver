@@ -2,18 +2,19 @@
 using Polly.Extensions.Http;
 using System;
 using System.Net.Http;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace FutureNHS.WOPIHost.HttpHelpers
 {
     /// <summary>
-    /// Core message handler that adds retry, circuit breaker and bulkhead policies to all outbound requests
+    /// Core message handler that adds circuit breaker, bulkhead and optionally retry policies to an HttpRequest (for HttpMethod.Get)
     /// </summary>
-    public sealed class RetryHandler : DelegatingHandler
+    public sealed class CoreResilientRetryHandler : DelegatingHandler
     {
         const int RETRY_ATTEMPTS_ON_TRANSIENT_ERROR = 3;
 
-        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, System.Threading.CancellationToken cancellationToken)
+        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage httpRequestMessage, CancellationToken cancellationToken)
         {
             var jitterer = new Random();
 
@@ -35,9 +36,11 @@ namespace FutureNHS.WOPIHost.HttpHelpers
                             durationOfBreak: TimeSpan.FromSeconds(30)           // then open the circuit for 30 seconds
                             );
 
-            var policy = Policy.WrapAsync(retryPolicyWithJitter, bulkheadPolicy, circuitBreakerPolicy);
+            var policy = HttpMethod.Get == httpRequestMessage.Method
+                ? Policy.WrapAsync(retryPolicyWithJitter, bulkheadPolicy, circuitBreakerPolicy) 
+                : Policy.WrapAsync(bulkheadPolicy, circuitBreakerPolicy);
 
-            return policy.ExecuteAsync(() => base.SendAsync(request, cancellationToken));
+            return policy.ExecuteAsync(() => base.SendAsync(httpRequestMessage, cancellationToken));
         }
     }
 }

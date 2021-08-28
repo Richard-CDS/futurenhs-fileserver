@@ -122,7 +122,7 @@ namespace FutureNHS_WOPI_Host_UnitTests
 
             var file = File.With("DF796179-DB2F-4A06-B4D5-AD7F012CC2CC", "2021-08-09T18:15:02.4214747Z");
 
-            var fileMetadata = await fileRepository.GetAsync(file, cancellationToken);
+            var fileMetadata = await fileRepository.GetMetadataAsync(file, cancellationToken);
 
             Assert.IsNotNull(fileMetadata);
 
