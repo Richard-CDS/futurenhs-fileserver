@@ -57,7 +57,11 @@ namespace FutureNHS.WOPIHost
 
             var wopiHostUrl = encodedRequestUrl.ToUpperInvariant();
 
-            var timestamp = Convert.ToInt64(httpRequest.Headers["X-WOPI-Timestamp"].Single().Trim());
+            var wopiTimestamp = httpRequest.Headers["X-WOPI-Timestamp"].SingleOrDefault();
+
+            if (string.IsNullOrWhiteSpace(wopiTimestamp)) throw new InvalidOperationException("The X-WOPI-Timestamp header is missing from the request and the caller is required to present proof");
+
+            var timestamp = Convert.ToInt64(wopiTimestamp.Trim());
 
             var accessTokenBytes = Encoding.UTF8.GetBytes(encodedAccessToken);
             var wopiHostUrlBytes = Encoding.UTF8.GetBytes(wopiHostUrl);

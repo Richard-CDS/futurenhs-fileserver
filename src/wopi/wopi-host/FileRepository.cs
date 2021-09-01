@@ -138,14 +138,15 @@ namespace FutureNHS.WOPIHost
 
             Debug.Assert(!string.IsNullOrWhiteSpace(fileMetadata.BlobName));
             Debug.Assert(!string.IsNullOrWhiteSpace(fileMetadata.Version));
+            Debug.Assert(!string.IsNullOrWhiteSpace(fileMetadata.Name));
 
-            var blobUri = await _azureBlobStoreClient.GenerateEphemeralDownloadLink(_blobContainerName, fileMetadata.BlobName, fileMetadata.Version, cancellationToken);
+            var blobUri = await _azureBlobStoreClient.GenerateEphemeralDownloadLink(_blobContainerName, fileMetadata.BlobName, fileMetadata.Version, fileMetadata.Name, cancellationToken);
 
             Debug.Assert(blobUri.IsAbsoluteUri);
 
             // The blob uri links direct to the blob store using the azure assigned DNS entry for the host name, however, we want to direct all 
             // traffic through our application gateway therefore we need to amend the url
-
+            
             var uriBuilder = new UriBuilder {
                 Path = string.Concat("gateway/media", blobUri.LocalPath),
                 Query = blobUri.Query

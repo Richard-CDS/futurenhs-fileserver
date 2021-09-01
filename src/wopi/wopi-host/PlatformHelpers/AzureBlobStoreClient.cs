@@ -18,7 +18,7 @@ namespace FutureNHS.WOPIHost.PlatformHelpers
     {
         Task<BlobDownloadDetails> FetchBlobAndWriteToStream(string containerName, string blobName, string blobVersion, Stream streamToWriteTo, CancellationToken cancellationToken);
 
-        Task<Uri> GenerateEphemeralDownloadLink(string containerName, string blobName, string blobVersion, CancellationToken cancellationToken);
+        Task<Uri> GenerateEphemeralDownloadLink(string containerName, string blobName, string blobVersion, string publicFacingBlobName, CancellationToken cancellationToken);
     }
 
     /// <summary>
@@ -39,6 +39,8 @@ namespace FutureNHS.WOPIHost.PlatformHelpers
     /// </remarks>
     public sealed class AzureBlobStoreClient : IAzureBlobStoreClient
     {
+        const int TOKEN_SAS_TIMEOUT_IN_MINUTES = 40;                 // Aligns with authentication cookie timeout policy for which we have an NFR
+
         private readonly ISystemClock _clock;
         private readonly ILogger<AzureBlobStoreClient>? _logger;
 
@@ -125,7 +127,7 @@ namespace FutureNHS.WOPIHost.PlatformHelpers
             }
         }
 
-        async Task<Uri> IAzureBlobStoreClient.GenerateEphemeralDownloadLink(string containerName, string blobName, string blobVersion, CancellationToken cancellationToken)
+        async Task<Uri> IAzureBlobStoreClient.GenerateEphemeralDownloadLink(string containerName, string blobName, string blobVersion, string publicFacingBlobName, CancellationToken cancellationToken)
         {   
             // We will secure the link by creating a user delegate sas token signed by the managed identity of this application, thus
             // only the intersection of allowed permissions are applicable.   In this case, we only want to assign the read 
@@ -137,7 +139,8 @@ namespace FutureNHS.WOPIHost.PlatformHelpers
             if (string.IsNullOrWhiteSpace(containerName)) throw new ArgumentNullException(nameof(containerName));
             if (string.IsNullOrWhiteSpace(blobName)) throw new ArgumentNullException(nameof(blobName));
             if (string.IsNullOrWhiteSpace(blobVersion)) throw new ArgumentNullException(nameof(blobVersion));
-
+            if (string.IsNullOrWhiteSpace(publicFacingBlobName)) throw new ArgumentNullException(nameof(publicFacingBlobName));
+            
             cancellationToken.ThrowIfCancellationRequested();
 
             var managedIdentityCredential = new DefaultAzureCredential();
@@ -165,7 +168,7 @@ namespace FutureNHS.WOPIHost.PlatformHelpers
 
             var tokenStartsOn = _clock.UtcNow;
 
-            var tokenExpiresOn = tokenStartsOn.AddMinutes(30);
+            var tokenExpiresOn = tokenStartsOn.AddMinutes(TOKEN_SAS_TIMEOUT_IN_MINUTES);
 
             try
             {
@@ -184,9 +187,9 @@ namespace FutureNHS.WOPIHost.PlatformHelpers
                     Resource = "b", 
                     StartsOn = tokenStartsOn, 
                     ExpiresOn = tokenExpiresOn, 
-                    Protocol = SasProtocol.Https, 
+                    Protocol = SasProtocol.Https,
+                    ContentDisposition = $"attachment; filename*=UTF-8''{Uri.EscapeDataString(publicFacingBlobName)}"
                     //PreauthorizedAgentObjectId = set this if we use AAD to authenticate our users, 
-                    //ContentDisposition = opportunity to use this to set the correct file name for the download
                     };
 
                 var blobUriBuilder = new BlobUriBuilder(blobClient.Uri) { 
