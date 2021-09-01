@@ -182,7 +182,7 @@ namespace FutureNHS_WOPI_Host_UnitTests
 
             Assert.IsNotNull(uri);
 
-            Assert.IsFalse(uri.IsAbsoluteUri);
+            Assert.IsTrue(uri.IsAbsoluteUri);
         }
 #endif
     }

@@ -12,6 +12,7 @@ namespace FutureNHS_WOPI_Host_UnitTests.Stubs
         private readonly Func<bool> _isUnableToValidateAccessToken;
 
         internal WopiRequestStub(Func<HttpContext, CancellationToken, Task> handleAsyncImpl, Func<bool> isUnableToValidateAccessToken = default)
+            : base(accessToken: "access-token", isWriteAccessRequired: false, demandsProof: true)
         {
             _handleAsyncImpl = handleAsyncImpl;
             _isUnableToValidateAccessToken = isUnableToValidateAccessToken;
