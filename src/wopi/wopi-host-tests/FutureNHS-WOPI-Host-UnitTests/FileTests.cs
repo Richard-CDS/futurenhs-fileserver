@@ -86,6 +86,66 @@ namespace FutureNHS_WOPI_Host_UnitTests
         }
 
 
+        [TestMethod]
+        [ExpectedException(typeof(InvalidOperationException))]
+        public void FromId_ThrowsIfFileVersionEncodedInIdMismatchesWithHeaderVersion()
+        {
+            var id = "file-name|file-version";
+
+            var fileVersion = "file-version-2";
+
+            _ = File.FromId(id, fileVersion);
+        }
+
+        [TestMethod]
+        public void FromId_DoesNotThrowIfFileVersionEncodedInIdMatchesWithHeaderVersion()
+        {
+            var id = "file-name|file-version";
+
+            var fileVersion = "file-version";
+
+            _ = File.FromId(id, fileVersion);
+        }
+
+        [TestMethod]
+        public void FromId_BuildsCorrectStructureFromEncodedIdWhenNoHeaderVersion()
+        {
+            var id = "file-name|file-version";
+
+            var file = File.FromId(id, fileVersion: default);
+
+            Assert.IsFalse(file.IsEmpty);
+
+            Assert.AreEqual(id, file.Id);
+            Assert.AreEqual("file-name", file.Name);
+            Assert.AreEqual("file-version", file.Version);
+        }
+
+        [TestMethod]
+        public void FromId_BuildsCorrectStructureFromEncodedIdWithHeaderVersion()
+        {
+            var id = "file-name|file-version";
+
+            var file = File.FromId(id, fileVersion: "file-version");
+
+            Assert.IsFalse(file.IsEmpty);
+
+            Assert.AreEqual(id, file.Id);
+            Assert.AreEqual("file-name", file.Name);
+            Assert.AreEqual("file-version", file.Version);
+
+            id = "file-name";
+
+            file = File.FromId(id, fileVersion: "file-version");
+
+            Assert.IsFalse(file.IsEmpty);
+
+            Assert.AreEqual("file-name|file-version", file.Id);
+            Assert.AreEqual("file-name", file.Name);
+            Assert.AreEqual("file-version", file.Version);
+        }
+
+
 
         [TestMethod]
         public void IsEmpty_ReturnsTrueForBlindlyConstructedInstant()

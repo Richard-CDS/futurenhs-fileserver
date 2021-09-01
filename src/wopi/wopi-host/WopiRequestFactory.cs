@@ -90,19 +90,25 @@ namespace FutureNHS.WOPIHost
 
                 if (string.IsNullOrWhiteSpace(fileId)) return WopiRequest.EMPTY;
 
-                var file = (File)fileId;
+                var fileVersion = httpRequest.Headers["X-WOPI-ItemVersion"].FirstOrDefault();
+
+                var file = File.FromId(fileId, fileVersion);
 
                 if (0 == string.Compare("GET", method, StringComparison.OrdinalIgnoreCase))
                 {
                     _logger?.LogTrace($"Identified this to be a Get File request");
 
+                    var isEphemeralRedirect = bool.Parse(httpRequest.Query["ephemeral_redirect"].FirstOrDefault() ?? bool.FalseString);
+
+                    if (isEphemeralRedirect) return RedirectToFileStoreRequest.With(file, accessToken);
+                    
                     return GetFileWopiRequest.With(file, accessToken);
                 }
                 else if (0 == string.Compare("POST", method, StringComparison.OrdinalIgnoreCase))
                 {
                     _logger?.LogTrace($"Identified this to be a Save File request");
 
-                    return PostFileWopiRequest.With(file.Name, accessToken); ;
+                    return PostFileWopiRequest.With(file.Name, accessToken); 
                 }
                 else _logger?.LogTrace($"The request method '{method}' is not supported for path '{path.Value ?? "null"}'");
             }

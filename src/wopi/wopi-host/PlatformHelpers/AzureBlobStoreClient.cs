@@ -1,7 +1,9 @@
 ﻿using Azure.Identity;
 using Azure.Storage.Blobs;
 using Azure.Storage.Blobs.Models;
+using Azure.Storage.Sas;
 using FutureNHS.WOPIHost.Exceptions;
+using Microsoft.Extensions.Internal;
 using Microsoft.Extensions.Logging;
 using System;
 using System.Globalization;
@@ -15,6 +17,8 @@ namespace FutureNHS.WOPIHost.PlatformHelpers
     public interface IAzureBlobStoreClient
     {
         Task<BlobDownloadDetails> FetchBlobAndWriteToStream(string containerName, string blobName, string blobVersion, Stream streamToWriteTo, CancellationToken cancellationToken);
+
+        Task<Uri> GenerateEphemeralDownloadLink(string containerName, string blobName, string blobVersion, CancellationToken cancellationToken);
     }
 
     /// <summary>
@@ -35,15 +39,17 @@ namespace FutureNHS.WOPIHost.PlatformHelpers
     /// </remarks>
     public sealed class AzureBlobStoreClient : IAzureBlobStoreClient
     {
+        private readonly ISystemClock _clock;
         private readonly ILogger<AzureBlobStoreClient>? _logger;
 
         private readonly Uri _primaryServiceUrl;
         private readonly Uri _geoRedundantServiceUrl;
 
-        public AzureBlobStoreClient(Uri primaryServiceUrl, Uri geoRedundantServiceUrl, ILogger<AzureBlobStoreClient>? logger)
+        public AzureBlobStoreClient(Uri primaryServiceUrl, Uri geoRedundantServiceUrl, ISystemClock clock, ILogger<AzureBlobStoreClient>? logger)
         {
             _primaryServiceUrl = primaryServiceUrl                   ?? throw new ArgumentNullException(nameof(primaryServiceUrl));
             _geoRedundantServiceUrl = geoRedundantServiceUrl         ?? throw new ArgumentNullException(nameof(geoRedundantServiceUrl));
+            _clock = clock                                           ?? throw new ArgumentNullException(nameof(clock));
 
             _logger = logger;
         }
@@ -114,6 +120,86 @@ namespace FutureNHS.WOPIHost.PlatformHelpers
             catch (Azure.RequestFailedException ex)
             {
                 _logger?.LogError(ex, $"Unable to access the storage endpoint as the download request failed: '{ ex.Status } { Enum.Parse(typeof(HttpStatusCode), Convert.ToString(ex.Status, CultureInfo.InvariantCulture)) }'");
+
+                throw;
+            }
+        }
+
+        async Task<Uri> IAzureBlobStoreClient.GenerateEphemeralDownloadLink(string containerName, string blobName, string blobVersion, CancellationToken cancellationToken)
+        {   
+            // We will secure the link by creating a user delegate sas token signed by the managed identity of this application, thus
+            // only the intersection of allowed permissions are applicable.   In this case, we only want to assign the read 
+            // permission to the token, and for such access to be limited to a set period of time after which the token will expire
+            //
+            // If running local, note that the azure credentials resolved are those you are logged in as (for example the Visual Studio
+            // azure account)
+
+            if (string.IsNullOrWhiteSpace(containerName)) throw new ArgumentNullException(nameof(containerName));
+            if (string.IsNullOrWhiteSpace(blobName)) throw new ArgumentNullException(nameof(blobName));
+            if (string.IsNullOrWhiteSpace(blobVersion)) throw new ArgumentNullException(nameof(blobVersion));
+
+            cancellationToken.ThrowIfCancellationRequested();
+
+            var managedIdentityCredential = new DefaultAzureCredential();
+
+            var blobClientOptions = new BlobClientOptions { GeoRedundantSecondaryUri = _geoRedundantServiceUrl };
+
+            // TODO - Set retry options in line with NFRs once they have been established with the client
+
+            blobClientOptions.Retry.Delay = TimeSpan.FromMilliseconds(800);
+            blobClientOptions.Retry.MaxDelay = TimeSpan.FromMinutes(1);
+            blobClientOptions.Retry.MaxRetries = 5;
+            blobClientOptions.Retry.Mode = Azure.Core.RetryMode.Exponential;
+            blobClientOptions.Retry.NetworkTimeout = TimeSpan.FromSeconds(100);
+
+            blobClientOptions.Diagnostics.IsDistributedTracingEnabled = true;
+            blobClientOptions.Diagnostics.IsLoggingContentEnabled = false;
+            blobClientOptions.Diagnostics.IsLoggingEnabled = true;
+            blobClientOptions.Diagnostics.IsTelemetryEnabled = true;
+
+            var blobServiceClient = new BlobServiceClient(_primaryServiceUrl, managedIdentityCredential, blobClientOptions);
+
+            var blobContainerClient = blobServiceClient.GetBlobContainerClient(containerName);
+
+            var blobClient = blobContainerClient.GetBlobClient(blobName).WithVersion(blobVersion);
+
+            var tokenStartsOn = _clock.UtcNow;
+
+            var tokenExpiresOn = tokenStartsOn.AddMinutes(30);
+
+            try
+            {
+                var azureResponse = await blobServiceClient.GetUserDelegationKeyAsync(tokenStartsOn, tokenExpiresOn, cancellationToken);
+
+                var rawResponse = azureResponse.GetRawResponse();
+
+                var userDelegationKey = azureResponse.Value;
+
+                var readOnlyPermission = BlobSasPermissions.Read;
+
+                var blobSasBuilder = new BlobSasBuilder(readOnlyPermission, tokenExpiresOn) {
+                    BlobContainerName = blobContainerClient.Name,
+                    BlobName = blobClient.Name,
+                    BlobVersionId = blobVersion, 
+                    Resource = "b", 
+                    StartsOn = tokenStartsOn, 
+                    ExpiresOn = tokenExpiresOn, 
+                    Protocol = SasProtocol.Https, 
+                    //PreauthorizedAgentObjectId = set this if we use AAD to authenticate our users, 
+                    //ContentDisposition = opportunity to use this to set the correct file name for the download
+                    };
+
+                var blobUriBuilder = new BlobUriBuilder(blobClient.Uri) { 
+                    Sas = blobSasBuilder.ToSasQueryParameters(userDelegationKey, blobServiceClient.AccountName)
+                    };
+
+                var uri = blobUriBuilder.ToUri();
+
+                return uri;
+            }
+            catch (Azure.RequestFailedException ex)
+            {
+                _logger?.LogError(ex, $"Unable to access the storage endpoint to generate a user delegation key: '{ ex.Status } { Enum.Parse(typeof(HttpStatusCode), Convert.ToString(ex.Status, CultureInfo.InvariantCulture)) }'");
 
                 throw;
             }

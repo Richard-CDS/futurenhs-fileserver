@@ -31,6 +31,15 @@ namespace FutureNHS.WOPIHost
         /// <param name="cancellationToken"></param>
         /// <returns>The requested metadata in the success case</returns>
         Task<FileMetadata> GetMetadataAsync(File file, CancellationToken cancellationToken);
+
+        /// <summary>
+        /// Tasked with retrieving an ephemeral endpoint from which the contents of the file can be directly downloaded without the 
+        /// need for it to be proxied through our file server
+        /// </summary>
+        /// <param name="file">The file to which the ephemeral endpoint will be explicitly tied</param>
+        /// <param name="cancellationToken"></param>
+        /// <returns>In the success case, the url of the endpoint else a null value</returns>
+        Task<Uri?> GenerateEphemeralDownloadLink(File file, CancellationToken cancellationToken);
     }
 
     public sealed class FileRepository : IFileRepository
@@ -115,6 +124,34 @@ namespace FutureNHS.WOPIHost
                 lastModified: downloadDetails.LastModified,
                 fileMetadata: fileMetadata
                 );
+        }
+
+        async Task<Uri?> IFileRepository.GenerateEphemeralDownloadLink(File file, CancellationToken cancellationToken)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+
+            if (file.IsEmpty) throw new ArgumentNullException(nameof(file));
+
+            var fileMetadata = await ((IFileRepository)this).GetMetadataAsync(file, cancellationToken);
+
+            if (fileMetadata.IsEmpty) return default;
+
+            Debug.Assert(!string.IsNullOrWhiteSpace(fileMetadata.BlobName));
+            Debug.Assert(!string.IsNullOrWhiteSpace(fileMetadata.Version));
+
+            var blobUri = await _azureBlobStoreClient.GenerateEphemeralDownloadLink(_blobContainerName, fileMetadata.BlobName, fileMetadata.Version, cancellationToken);
+
+            Debug.Assert(blobUri.IsAbsoluteUri);
+
+            // The blob uri links direct to the blob store using the azure assigned DNS entry for the host name, however, we want to direct all 
+            // traffic through our application gateway therefore we need to amend the url
+
+            var uriBuilder = new UriBuilder {
+                Path = string.Concat("gateway/media", blobUri.LocalPath),
+                Query = blobUri.Query
+            };
+
+            return uriBuilder.Uri;
         }
     }
 }

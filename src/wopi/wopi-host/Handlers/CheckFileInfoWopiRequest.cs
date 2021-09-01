@@ -15,7 +15,7 @@ namespace FutureNHS.WOPIHost.Handlers
         private readonly Features? _features;
 
         private CheckFileInfoWopiRequest(File file, string accessToken, Features? features) 
-            : base(accessToken, isWriteAccessRequired: false) 
+            : base(accessToken, isWriteAccessRequired: false, demandsProof: true) 
         {
             if (file.IsEmpty) throw new ArgumentNullException(nameof(file));
 

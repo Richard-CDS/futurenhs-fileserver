@@ -13,16 +13,19 @@ namespace FutureNHS.WOPIHost.Handlers
 
         protected WopiRequest() { }
 
-        protected WopiRequest(string accessToken, bool isWriteAccessRequired)
+        protected WopiRequest(string accessToken, bool isWriteAccessRequired, bool demandsProof)
         {
             if (string.IsNullOrWhiteSpace(accessToken)) throw new ArgumentNullException(nameof(accessToken));
 
             AccessToken = accessToken;
+            DemandsProof = demandsProof;
 
             _isWriteAccessRequired = isWriteAccessRequired;
         }
 
         public string? AccessToken { get; }
+
+        public bool? DemandsProof { get; }
 
         internal bool IsEmpty => ReferenceEquals(this, WopiRequest.EMPTY);
 

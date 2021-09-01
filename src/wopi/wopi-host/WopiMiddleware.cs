@@ -2,6 +2,7 @@
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using System;
+using System.Diagnostics;
 using System.Threading.Tasks;
 
 namespace FutureNHS.WOPIHost
@@ -61,25 +62,33 @@ namespace FutureNHS.WOPIHost
 
             if (!wopiRequestFactory.TryCreateRequest(httpContext.Request, out var wopiRequest)) return THIS_IS_NOT_A_WOPI_REQUEST;
 
+            Debug.Assert(!wopiRequest.IsEmpty);
+            Debug.Assert(wopiRequest.DemandsProof.HasValue);
+
             logger?.LogTrace($"Looks like a WOPI request so going to try and route it to the correct handler");
 
-            var wopiDiscoveryDocumentFactory = httpContext.RequestServices.GetRequiredService<IWopiDiscoveryDocumentFactory>();
+            if (wopiRequest.DemandsProof.Value)
+            {
+                logger?.LogTrace($"Proof is demanded by the request handler therefore delegating to cryptographically verify the offered proof token: '{wopiRequest.GetType().Name}'");
 
-            var wopiDiscoveryDocument = await wopiDiscoveryDocumentFactory.CreateDocumentAsync(cancellationToken);
+                var wopiDiscoveryDocumentFactory = httpContext.RequestServices.GetRequiredService<IWopiDiscoveryDocumentFactory>();
 
-            if (wopiDiscoveryDocument.IsEmpty) throw new ApplicationException("This is a WOPI request but the WOPI discovery document is temporarily unavilable/inaccessible and so the request cannot be processed");
+                var wopiDiscoveryDocument = await wopiDiscoveryDocumentFactory.CreateDocumentAsync(cancellationToken);
 
-            logger?.LogTrace($"Resolved discovery document to use so time to try and validate the proof offered by the caller");
+                if (wopiDiscoveryDocument.IsEmpty) throw new ApplicationException("This is a WOPI request but the WOPI discovery document is temporarily unavilable/inaccessible and so the request cannot be processed");
 
-            var wopiCryptoProofChecker = httpContext.RequestServices.GetRequiredService<IWopiCryptoProofChecker>();
+                logger?.LogTrace($"Resolved discovery document to use so time to try and validate the proof offered by the caller");
 
-            var (isInvalid, refetchProofKeys) = wopiCryptoProofChecker.IsProofInvalid(httpContext.Request, wopiDiscoveryDocument);
+                var wopiCryptoProofChecker = httpContext.RequestServices.GetRequiredService<IWopiCryptoProofChecker>();
 
-            if (refetchProofKeys) wopiDiscoveryDocument.IsTainted = true;
+                var (isInvalid, refetchProofKeys) = wopiCryptoProofChecker.IsProofInvalid(httpContext.Request, wopiDiscoveryDocument);
 
-            if (isInvalid) throw new ApplicationException("This is a WOPI request but the proof that has been provided is considered invalid for this host to process");
+                if (refetchProofKeys) wopiDiscoveryDocument.IsTainted = true;
 
-            logger?.LogTrace($"Proof determined valid so routing to the handler of the request: '{wopiRequest.GetType().Name}'");
+                if (isInvalid) throw new ApplicationException("This is a WOPI request but the proof that has been provided is considered invalid for this host to process");
+
+                logger?.LogTrace($"Proof determined valid so routing to the handler of the request: '{wopiRequest.GetType().Name}'");
+            }
 
             await wopiRequest.HandleAsync(httpContext, cancellationToken);
 

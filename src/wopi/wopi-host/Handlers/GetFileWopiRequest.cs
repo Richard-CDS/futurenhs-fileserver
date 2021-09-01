@@ -1,20 +1,17 @@
 ﻿using Microsoft.AspNetCore.Http;
-using Microsoft.AspNetCore.Hosting;
+using Microsoft.Extensions.DependencyInjection;
 using System;
 using System.Threading;
 using System.Threading.Tasks;
-using System.IO;
-using Microsoft.Extensions.DependencyInjection;
 
 namespace FutureNHS.WOPIHost.Handlers
 {
-    internal sealed class GetFileWopiRequest
-        : WopiRequest
+    internal sealed class GetFileWopiRequest : WopiRequest
     {
         private readonly File _file;
 
         private GetFileWopiRequest(File file, string accessToken) 
-            : base(accessToken, isWriteAccessRequired: false) 
+            : base(accessToken, isWriteAccessRequired: false, demandsProof: true) 
         {
             if (file.IsEmpty) throw new ArgumentNullException(nameof(file));
 
@@ -27,12 +24,17 @@ namespace FutureNHS.WOPIHost.Handlers
         {
             // GET /wopi/files/(file_id)/content 
 
+            // TODO - Is it possible to redirect the WOPI file content request so that the WOPI client pulls the file down 
+            //        directly from blob storage rather than have us acting as a proxy?  
+            //        Tried httpResponse.Redirect("http://127.0.0.1:44355/redirected", permanent: false); locally without any 
+            //        success (no callback) so need to investigate Collabora codebase to see if it can handle the redirect response
+            //        as initial testing suggests it might not be doing so.
+            //        Worth chasing up as potentially a solid win for us, as well as enabling us to reuse the download redirect
+            //        code used by the main site
+
             var fileRepository = httpContext.RequestServices.GetRequiredService<IFileRepository>();
 
             var httpResponse = httpContext.Response;
-
-            // NB - Collabora does not currently support the ItemVersion header but we'll add it here for completeness and hopefully
-            //      come back and use it once Collabora echoes it back to our CheckFileInfo endpoint (etc)
 
             httpResponse.Headers.Add("X-WOPI-ItemVersion", _file.Version);
 

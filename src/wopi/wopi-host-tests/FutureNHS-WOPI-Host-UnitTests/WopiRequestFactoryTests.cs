@@ -194,6 +194,40 @@ namespace FutureNHS_WOPI_Host_UnitTests
         }
 
         [TestMethod]
+        public void CreateRequest_IdentifiesEphemeralRedirectRequest()
+        {
+            var features = new Features();
+
+            var snapshot = new Moq.Mock<IOptionsSnapshot<Features>>();
+
+            snapshot.SetupGet(x => x.Value).Returns(features);
+
+            IWopiRequestFactory wopiRequestFactory = new WopiRequestFactory(features: snapshot.Object);
+
+            var httpContext = new DefaultHttpContext();
+
+            var httpRequest = httpContext.Request;
+
+            httpRequest.Method = HttpMethods.Get;
+            httpRequest.Path = "/wopi/files/file-name|file-version/contents";
+            httpRequest.QueryString = new QueryString("?access_token=<valid-access-token>&ephemeral_redirect=true");
+
+            httpRequest.Headers["X-WOPI-ItemVersion"] = "file-version";
+
+            var createdOk = wopiRequestFactory.TryCreateRequest(request: httpContext.Request, out var wopiRequest);
+
+            Assert.IsTrue(createdOk);
+
+            Assert.IsNotNull(wopiRequest);
+
+            Assert.IsInstanceOfType(wopiRequest, typeof(RedirectToFileStoreRequest), "Expected Redirect to File Store requests to be identified");
+
+            var getFileInfoRequest = (RedirectToFileStoreRequest)wopiRequest;
+
+            Assert.AreEqual("<valid-access-token>", getFileInfoRequest.AccessToken, "Expected the access token to be extracted and retained");
+        }
+
+        [TestMethod]
         public void CreateRequest_IdentifiesSaveFileRequest()
         {
             var features = new Features();

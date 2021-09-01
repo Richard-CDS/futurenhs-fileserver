@@ -13,6 +13,7 @@ using Microsoft.Extensions.Options;
 using Microsoft.FeatureManagement;
 using Microsoft.FeatureManagement.FeatureFilters;
 using System;
+using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Text;
@@ -68,9 +69,10 @@ namespace FutureNHS.WOPIHost
                     if (config.PrimaryServiceUrl is null) throw new ApplicationException("The azure blob storage primary service url is null in the files configuration section");
                     if (config.GeoRedundantServiceUrl is null) throw new ApplicationException("The azure blob storage geo-redundant service url is null in the files configuration section");
 
+                    var clock = sp.GetRequiredService<ISystemClock>();
                     var logger = sp.GetRequiredService<ILogger<AzureBlobStoreClient>>();
 
-                    return new AzureBlobStoreClient(config.PrimaryServiceUrl, config.GeoRedundantServiceUrl, logger);
+                    return new AzureBlobStoreClient(config.PrimaryServiceUrl, config.GeoRedundantServiceUrl, clock, logger);
                 });
 
             services.AddScoped(
@@ -250,6 +252,8 @@ namespace FutureNHS.WOPIHost
             var hostFilesUrl = wopiConfiguration.HostFilesUrl;
 
             if (string.IsNullOrWhiteSpace(hostFilesUrl)) return;
+
+            Debug.Assert(fileId is object);
 
             var wopiHostFileEndpointUrl = new Uri(Path.Combine(hostFilesUrl, fileId), UriKind.Absolute);
 

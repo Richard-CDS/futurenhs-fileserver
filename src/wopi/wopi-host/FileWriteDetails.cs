@@ -30,7 +30,7 @@ namespace FutureNHS.WOPIHost
 
         public bool IsEmpty => ReferenceEquals(this, EMPTY);
 
-        public FileMetadata FileMetadata { get; }
+        public FileMetadata? FileMetadata { get; }
 
         public string? Version { get; }
         public string? ContentType { get; }

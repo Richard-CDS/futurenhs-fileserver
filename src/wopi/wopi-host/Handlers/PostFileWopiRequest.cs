@@ -14,7 +14,7 @@ namespace FutureNHS.WOPIHost.Handlers
         private readonly string _fileId;
 
         private PostFileWopiRequest(string fileId, string accessToken)
-            : base(accessToken, isWriteAccessRequired: true)
+            : base(accessToken, isWriteAccessRequired: true, demandsProof: true)
         {
             if (string.IsNullOrWhiteSpace(fileId)) throw new ArgumentNullException(nameof(fileId));
 

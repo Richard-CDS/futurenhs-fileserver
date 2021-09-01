@@ -35,19 +35,26 @@ namespace FutureNHS.WOPIHost
             return new File(fileName, fileVersion);
         }
 
-        private static File With(string id)
+        public static File FromId(string id, string? fileVersion = default)
         {
+            // The version of the file may be provided in the id, or alternatively in the header of the request if 
+            // the WOPI client fully supported the versioning protocol.   The optional parameter is the value taken 
+            // from the header if it exists.
+
             if (string.IsNullOrWhiteSpace(id)) return EMPTY;
 
             var segments = id.Split('|', StringSplitOptions.RemoveEmptyEntries);
 
-            if (2 != segments.Length) return EMPTY;
-
             var fileName = segments[0];
-            var fileVersion = segments[1];
+
+            var fileVersionFromId = 2 <= segments.Length ? segments[1] : default;
+
+            if (string.IsNullOrWhiteSpace(fileVersion)) fileVersion = fileVersionFromId;
 
             if (string.IsNullOrWhiteSpace(fileName)) return EMPTY;
             if (string.IsNullOrWhiteSpace(fileVersion)) return EMPTY;
+
+            if (fileVersionFromId is object && !fileVersion.Equals(fileVersionFromId, StringComparison.OrdinalIgnoreCase)) throw new InvalidOperationException($"The file version taken from the X-WOPI-ItemVersion header '{fileVersion}' differs from the version encoded in the file id '{fileVersionFromId}'");
 
             return new File(fileName.Trim(), fileVersion.Trim());
         }
@@ -95,7 +102,7 @@ namespace FutureNHS.WOPIHost
         public static bool operator !=(File left, File right) => !(left.Equals(right));
 
         public static implicit operator string?(File file) => file.IsEmpty ? default : file.Id;
-        public static implicit operator File(string id) => With(id);
+        public static implicit operator File(string id) => FromId(id);
 
         public override string ToString()
         {

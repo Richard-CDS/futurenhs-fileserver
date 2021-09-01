@@ -118,6 +118,8 @@ namespace FutureNHS.WOPIHost.PlatformHelpers
 #endif
         static AsyncPolicy GetAsyncBulkheadPolicy() => Policy.BulkheadAsync(maxParallelization: 3, maxQueuingActions: 25);
 
+
+        [SuppressMessage("Usage", "EF1001:Internal EF Core API usage.", Justification = "<Pending>")]
 #if DEBUG
         internal
 #else
