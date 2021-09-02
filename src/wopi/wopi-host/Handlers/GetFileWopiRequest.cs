@@ -38,7 +38,7 @@ namespace FutureNHS.WOPIHost.Handlers
 
             httpResponse.Headers.Add("X-WOPI-ItemVersion", _file.Version);
 
-            var responseStream = httpResponse.Body; 
+            var responseStream = httpResponse.Body;
 
             // TODO - Clarify this is the right time to start sending the body given it also locks headers for modification etc.
             //        Unsure yet whether we need to include headers with information pulled from blob storage or the file metadata 
@@ -46,28 +46,22 @@ namespace FutureNHS.WOPIHost.Handlers
             //        that this means for larger files we won't have to reserve enough memory/disk space to hold the complete file
             //        on this server
 
-            await httpResponse.StartAsync(cancellationToken);
-
-            var fileWriteDetails = await fileRepository.WriteToStreamAsync(_file, responseStream, cancellationToken);
-
-            if (fileWriteDetails.IsEmpty) throw new ApplicationException("Unable to load metadata for the requested file and version");
-
-            // TODO - Given we are writing direct to the response stream, is there a possibility that the wrong blob is sent to the client if the hash or version information 
-            //        of the blob used do not match with that of the blob we requested and thus expected?  Will throwing an exception after the event, result in some 
-            //        of the file being streamed (for larger files) before the response completes?  Need to test this thoroughly otherwise we may be at risk of sharing 
-            //        a file that the authenticated user is neither interested in, nor perhaps has the rights to access, or even worse, has been tampered with!
-
-            if (!string.Equals(fileWriteDetails.Version, _file.Version, StringComparison.OrdinalIgnoreCase)) throw new ApplicationException("The blob store client returned a version of the blob that does not match the version requested");
-
-            // Verify the hash stored in the database when the version was created is the same as the one of the file we just downloaded
-
-            var fileMetadata = fileWriteDetails.FileMetadata;
+            var fileMetadata = await fileRepository.GetMetadataAsync(_file, cancellationToken);
 
             if (fileMetadata.IsEmpty) throw new ApplicationException("The file metadata could not be found for a file that has been located in storage.  Please ensure the file is known to the application, or wait a few minutes for any database synchronisation activities to complete.  Alternatively report the issue to our support team so we can investigate if data has been lost as a result of a recent database restore operation.");
 
             if (FileStatus.Verified != fileMetadata.FileStatus) throw new ApplicationException($"The status of the file '{fileMetadata.FileStatus}' does not indicate it is safe to be shared with users.");
 
-            if (fileMetadata.ContentHash != fileWriteDetails.ContentHash) throw new ApplicationException("The hash of the stored file does not match the has of the version downloaded from storage.  The file may have been tampered with and will not be returned to the requestor");
+            await httpResponse.StartAsync(cancellationToken);
+
+            // This next bit is a little tricky because any validation we do after the call to write to the response stream still means 
+            // the client might have access to the full file already.  In other words, not much we can assure about what happens next!
+
+            var fileWriteDetails = await fileRepository.WriteToStreamAsync(fileMetadata, responseStream, cancellationToken);
+
+            if (fileWriteDetails.IsEmpty) throw new ApplicationException("Unable to pull the content for the requested file version");
+
+            if (!string.Equals(fileWriteDetails.Version, _file.Version, StringComparison.OrdinalIgnoreCase)) throw new ApplicationException("The blob store client returned a version of the blob that does not match the version requested");
 
             // Done reading, so make sure we are done writing too
 

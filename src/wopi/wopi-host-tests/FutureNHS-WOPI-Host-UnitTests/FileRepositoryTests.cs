@@ -1,6 +1,7 @@
 ﻿using FutureNHS.WOPIHost;
 using FutureNHS.WOPIHost.Configuration;
 using FutureNHS.WOPIHost.PlatformHelpers;
+using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Internal;
 using Microsoft.Extensions.Logging;
@@ -25,6 +26,12 @@ namespace FutureNHS_WOPI_Host_UnitTests
         public async Task WriteToStreamAsync_SanityCheckForLocalDevOnly()
         {
             var cancellationToken = new CancellationToken();
+
+            var optionsAccessor = new Moq.Mock<IOptions<MemoryCacheOptions>>();
+
+            optionsAccessor.Setup(x => x.Value).Returns(new MemoryCacheOptions());
+
+            var memoryCache = new MemoryCache(optionsAccessor.Object);
 
             var logger = new Moq.Mock<ILogger<FileRepository>>().Object;
             
@@ -52,7 +59,7 @@ namespace FutureNHS_WOPI_Host_UnitTests
             var primaryServiceUrl = new Uri(configuration.GetValue<string>("AzurePlatform:AzureBlobStorage:PrimaryServiceUrl"), UriKind.Absolute);
             var geoRedundantServiceUrl = new Uri(configuration.GetValue<string>("AzurePlatform:AzureBlobStorage:GeoRedundantServiceUrl"), UriKind.Absolute);
 
-            var azureBlobStorageClient = new AzureBlobStoreClient(primaryServiceUrl, geoRedundantServiceUrl, clock, default);
+            var azureBlobStorageClient = new AzureBlobStoreClient(primaryServiceUrl, geoRedundantServiceUrl, memoryCache, clock, default);
 
             var readWriteConnectionString = configuration.GetValue<string>("AzurePlatform:AzureSql:ReadWriteConnectionString");
             var readOnlyConnectionString = configuration.GetValue<string>("AzurePlatform:AzureSql:ReadOnlyConnectionString");
@@ -63,13 +70,17 @@ namespace FutureNHS_WOPI_Host_UnitTests
 
             IFileRepository fileRepository = new FileRepository(azureBlobStorageClient, azureSqlClient, azurePlatformConfigurationOptionsSnapshot.Object, logger);
 
-            // 4d6fa0f8-34a7-4f34-922f-8b06416097e1.pdf
+            var blobName = "4d6fa0f8-34a7-4f34-922f-8b06416097e1.pdf";
 
             var file = File.With("DF796179-DB2F-4A06-B4D5-AD7F012CC2CC", "2021-08-09T18:15:02.4214747Z");
 
+            var fileHash = "8n45KHxmXabrze7rq/s9Ww==";
+
             using var destinationStream = new System.IO.MemoryStream();
 
-            var fileWriteDetails = await fileRepository.WriteToStreamAsync(file, destinationStream, cancellationToken);
+            var fileMetadata = new FileMetadata("title", "description", file.Version, "owner", file.Name, "extension", 396764, blobName, clock.UtcNow, fileHash, FileStatus.Verified);
+
+            var fileWriteDetails = await fileRepository.WriteToStreamAsync(fileMetadata, destinationStream, cancellationToken);
 
             Assert.IsNotNull(fileWriteDetails);
 
@@ -78,13 +89,19 @@ namespace FutureNHS_WOPI_Host_UnitTests
             Assert.IsTrue(396764 == fileBytes.Length);
             Assert.IsTrue(396764 == fileWriteDetails.ContentLength);
 
-            Assert.AreEqual("8n45KHxmXabrze7rq/s9Ww==", fileWriteDetails.ContentHash);
+            Assert.AreEqual(fileHash, fileWriteDetails.ContentHash);
         }
 
         [TestMethod]
         public async Task GetMetadataAsync_SanityCheckForLocalDevOnly()
         {
             var cancellationToken = new CancellationToken();
+
+            var optionsAccessor = new Moq.Mock<IOptions<MemoryCacheOptions>>();
+
+            optionsAccessor.Setup(x => x.Value).Returns(new MemoryCacheOptions());
+
+            var memoryCache = new MemoryCache(optionsAccessor.Object);
 
             var logger = new Moq.Mock<ILogger<FileRepository>>().Object;
 
@@ -112,7 +129,7 @@ namespace FutureNHS_WOPI_Host_UnitTests
             var primaryServiceUrl = new Uri(configuration.GetValue<string>("AzurePlatform:AzureBlobStorage:PrimaryServiceUrl"), UriKind.Absolute);
             var geoRedundantServiceUrl = new Uri(configuration.GetValue<string>("AzurePlatform:AzureBlobStorage:GeoRedundantServiceUrl"), UriKind.Absolute);
 
-            var azureBlobStorageClient = new AzureBlobStoreClient(primaryServiceUrl, geoRedundantServiceUrl, clock, default);
+            var azureBlobStorageClient = new AzureBlobStoreClient(primaryServiceUrl, geoRedundantServiceUrl, memoryCache, clock, default);
 
             var readWriteConnectionString = configuration.GetValue<string>("AzurePlatform:AzureSql:ReadWriteConnectionString"); 
             var readOnlyConnectionString = configuration.GetValue<string>("AzurePlatform:AzureSql:ReadOnlyConnectionString"); 
@@ -139,6 +156,12 @@ namespace FutureNHS_WOPI_Host_UnitTests
         {
             var cancellationToken = new CancellationToken();
 
+            var optionsAccessor = new Moq.Mock<IOptions<MemoryCacheOptions>>();
+
+            optionsAccessor.Setup(x => x.Value).Returns(new MemoryCacheOptions());
+
+            var memoryCache = new MemoryCache(optionsAccessor.Object);
+
             var logger = new Moq.Mock<ILogger<FileRepository>>().Object;
 
             var clock = new SystemClock();
@@ -165,7 +188,7 @@ namespace FutureNHS_WOPI_Host_UnitTests
             var primaryServiceUrl = new Uri(configuration.GetValue<string>("AzurePlatform:AzureBlobStorage:PrimaryServiceUrl"), UriKind.Absolute);
             var geoRedundantServiceUrl = new Uri(configuration.GetValue<string>("AzurePlatform:AzureBlobStorage:GeoRedundantServiceUrl"), UriKind.Absolute);
 
-            var azureBlobStorageClient = new AzureBlobStoreClient(primaryServiceUrl, geoRedundantServiceUrl, clock, default);
+            var azureBlobStorageClient = new AzureBlobStoreClient(primaryServiceUrl, geoRedundantServiceUrl, memoryCache, clock, default);
 
             var readWriteConnectionString = configuration.GetValue<string>("AzurePlatform:AzureSql:ReadWriteConnectionString");
             var readOnlyConnectionString = configuration.GetValue<string>("AzurePlatform:AzureSql:ReadOnlyConnectionString");
@@ -178,7 +201,9 @@ namespace FutureNHS_WOPI_Host_UnitTests
 
             var file = File.With("DF796179-DB2F-4A06-B4D5-AD7F012CC2CC", "2021-08-09T18:15:02.4214747Z");
 
-            var uri = await fileRepository.GenerateEphemeralDownloadLink(file, cancellationToken);
+            var fileMetadata = await fileRepository.GetMetadataAsync(file, cancellationToken);
+
+            var uri = await fileRepository.GeneratePublicEphemeralDownloadLink(fileMetadata, cancellationToken);
 
             Assert.IsNotNull(uri);
 

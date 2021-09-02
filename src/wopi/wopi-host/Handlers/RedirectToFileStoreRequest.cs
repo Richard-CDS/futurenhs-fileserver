@@ -28,7 +28,13 @@ namespace FutureNHS.WOPIHost.Handlers
 
             var fileRepository = httpContext.RequestServices.GetRequiredService<IFileRepository>();
 
-            var uri = await fileRepository.GenerateEphemeralDownloadLink(_file, cancellationToken);
+            var fileMetadata = await fileRepository.GetMetadataAsync(_file, cancellationToken);
+
+            if (fileMetadata.IsEmpty) throw new ApplicationException("The file metadata could not be found.  Please ensure the file is known to the application, or wait a few minutes for any database synchronisation activities to complete.  Alternatively report the issue to our support team so we can investigate if data has been lost as a result of a recent database restore operation.");
+
+            if (FileStatus.Verified != fileMetadata.FileStatus) throw new ApplicationException($"The status of the file '{fileMetadata.FileStatus}' does not indicate it is yet safe to be shared with users.");
+
+            var uri = await fileRepository.GeneratePublicEphemeralDownloadLink(fileMetadata, cancellationToken);
 
             if (uri is null) throw new ApplicationException($"Unable to generate an ephemeral download link for the file '{_file.Id}'");
 

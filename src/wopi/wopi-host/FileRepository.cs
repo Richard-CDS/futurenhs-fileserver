@@ -3,8 +3,6 @@ using FutureNHS.WOPIHost.PlatformHelpers;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using System;
-using System.Data;
-using System.Data.SqlClient;
 using System.Diagnostics;
 using System.IO;
 using System.Text;
@@ -18,11 +16,11 @@ namespace FutureNHS.WOPIHost
         /// <summary>
         /// Tasked with retrieving a file located in storage and writing it into <paramref name="streamToWriteTo"/>
         /// </summary>
-        /// <param name="file">The name and version of the file to be used to locate the requested file in storage</param>
+        /// <param name="fileMetadata">The metadata pertinent to the file we are going to try and write to the stream</param>
         /// <param name="streamToWriteTo">The stream to which the content of the file will be written in the success case/></param>
         /// <param name="cancellationToken"></param>
         /// <returns></returns>
-        Task<FileWriteDetails> WriteToStreamAsync(File file, Stream streamToWriteTo, CancellationToken cancellationToken);
+        Task<FileWriteDetails> WriteToStreamAsync(FileMetadata fileMetadata, Stream streamToWriteTo, CancellationToken cancellationToken);
 
         /// <summary>
         /// Tasked with retrieving the extended metadata for a specific file version
@@ -34,12 +32,23 @@ namespace FutureNHS.WOPIHost
 
         /// <summary>
         /// Tasked with retrieving an ephemeral endpoint from which the contents of the file can be directly downloaded without the 
-        /// need for it to be proxied through our file server
+        /// need for it to be proxied through our file server.  The returned url will be formed such that traffic from outside of the 
+        /// virtual network will be routed through our application gateway
         /// </summary>
-        /// <param name="file">The file to which the ephemeral endpoint will be explicitly tied</param>
+        /// <param name="fileMetadata">The metadata for the file to which the ephemeral endpoint will be explicitly tied</param>
         /// <param name="cancellationToken"></param>
         /// <returns>In the success case, the url of the endpoint else a null value</returns>
-        Task<Uri?> GenerateEphemeralDownloadLink(File file, CancellationToken cancellationToken);
+        Task<Uri> GeneratePublicEphemeralDownloadLink(FileMetadata file, CancellationToken cancellationToken);
+
+        /// <summary>
+        /// Tasked with retrieving an ephemeral endpoint from which the contents of the file can be directly downloaded without the 
+        /// need for it to be proxied through our file server.  The returned url will be formed such that it can only be used by a 
+        /// caller whom resides within the same virtual network as our storage
+        /// </summary>
+        /// <param name="fileMetadata">The metadata for the file to which the ephemeral endpoint will be explicitly tied</param>
+        /// <param name="cancellationToken"></param>
+        /// <returns>In the success case, the url of the endpoint else a null value</returns>
+        Task<Uri> GeneratePrivateEphemeralDownloadLink(FileMetadata file, CancellationToken cancellationToken);
     }
 
     public sealed class FileRepository : IFileRepository
@@ -83,7 +92,7 @@ namespace FutureNHS.WOPIHost
             sb.AppendLine($"       , [SizeInBytes]     = a.[FileSize]");            // TODO - to be renamed in database
             sb.AppendLine($"       , [Extension]       = a.[FileExtension]");
             sb.AppendLine($"       , [BlobName]        = a.[FileUrl]");             // TODO - to be renamed in database
-            sb.AppendLine($"       , [FileContentHash] = @FileContentHash");        // TODO - Wire up when in database
+            sb.AppendLine($"       , [ContentHash]     = @FileContentHash");        // TODO - Wire up when in database
             sb.AppendLine($"       , [LastWriteTime]   = CONVERT(DATETIMEOFFSET, ISNULL(a.[ModifiedDate], a.[CreatedDate]))"); // TODO - DB data type needs changing to datetimeoffset, or datetime2 with renamed to suffix UTC so we know what it contains
             sb.AppendLine($"       , [FileStatus]      = a.[UploadStatus]");        // TODO - Earmarked to be renamed in DB to FileStatus
             sb.AppendLine($"       , [Owner]           = b.[UserName]");
@@ -98,20 +107,17 @@ namespace FutureNHS.WOPIHost
             return fileMetadata;
         }
 
-        async Task<FileWriteDetails> IFileRepository.WriteToStreamAsync(File file, Stream streamToWriteTo, CancellationToken cancellationToken)
+        async Task<FileWriteDetails> IFileRepository.WriteToStreamAsync(FileMetadata fileMetadata, Stream streamToWriteTo, CancellationToken cancellationToken)
         {
             cancellationToken.ThrowIfCancellationRequested();
 
-            if (file.IsEmpty) throw new ArgumentNullException(nameof(file));
-
-            var fileMetadata = await ((IFileRepository)this).GetMetadataAsync(file, cancellationToken);
-
-            if (fileMetadata.IsEmpty) return FileWriteDetails.EMPTY;
+            if (fileMetadata is null || fileMetadata.IsEmpty) throw new ArgumentNullException(nameof(fileMetadata));
 
             Debug.Assert(!string.IsNullOrWhiteSpace(fileMetadata.BlobName));
             Debug.Assert(!string.IsNullOrWhiteSpace(fileMetadata.Version));
+            Debug.Assert(!string.IsNullOrWhiteSpace(fileMetadata.ContentHash));
 
-            var downloadDetails = await _azureBlobStoreClient.FetchBlobAndWriteToStream(_blobContainerName, fileMetadata.BlobName, fileMetadata.Version, streamToWriteTo, cancellationToken);
+            var downloadDetails = await _azureBlobStoreClient.FetchBlobAndWriteToStream(_blobContainerName, fileMetadata.BlobName, fileMetadata.Version, fileMetadata.ContentHash, streamToWriteTo, cancellationToken);
 
             return new FileWriteDetails(
                 version: downloadDetails.VersionId,
@@ -126,15 +132,11 @@ namespace FutureNHS.WOPIHost
                 );
         }
 
-        async Task<Uri?> IFileRepository.GenerateEphemeralDownloadLink(File file, CancellationToken cancellationToken)
+        async Task<Uri> IFileRepository.GeneratePublicEphemeralDownloadLink(FileMetadata fileMetadata, CancellationToken cancellationToken)
         {
             cancellationToken.ThrowIfCancellationRequested();
 
-            if (file.IsEmpty) throw new ArgumentNullException(nameof(file));
-
-            var fileMetadata = await ((IFileRepository)this).GetMetadataAsync(file, cancellationToken);
-
-            if (fileMetadata.IsEmpty) return default;
+            if (fileMetadata is null || fileMetadata.IsEmpty) throw new ArgumentNullException(nameof(fileMetadata));
 
             Debug.Assert(!string.IsNullOrWhiteSpace(fileMetadata.BlobName));
             Debug.Assert(!string.IsNullOrWhiteSpace(fileMetadata.Version));
@@ -153,6 +155,24 @@ namespace FutureNHS.WOPIHost
             };
 
             return uriBuilder.Uri;
+        }
+
+        async Task<Uri> IFileRepository.GeneratePrivateEphemeralDownloadLink(FileMetadata fileMetadata, CancellationToken cancellationToken)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+
+            if (fileMetadata is null || fileMetadata.IsEmpty) throw new ArgumentNullException(nameof(fileMetadata));
+
+            Debug.Assert(!string.IsNullOrWhiteSpace(fileMetadata.BlobName));
+            Debug.Assert(!string.IsNullOrWhiteSpace(fileMetadata.Version));
+            Debug.Assert(!string.IsNullOrWhiteSpace(fileMetadata.Name));
+
+            var blobUri = await _azureBlobStoreClient.GenerateEphemeralDownloadLink(_blobContainerName, fileMetadata.BlobName, fileMetadata.Version, fileMetadata.Name, cancellationToken);
+
+            // The uri we are returning directly accesses the blob storage account.  It will not be routed through our application 
+            // gateway
+
+            return blobUri;
         }
     }
 }

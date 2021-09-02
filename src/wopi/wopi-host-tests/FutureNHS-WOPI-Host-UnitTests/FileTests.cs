@@ -160,6 +160,7 @@ namespace FutureNHS_WOPI_Host_UnitTests
         [TestMethod]
         public void Equals_IdentifiesWhenInstancesAreEqual()
         {
+#pragma warning disable CS1718 // Comparison made to same variable
             var file1 = new File();
             var file2 = new File();
 
@@ -224,6 +225,7 @@ namespace FutureNHS_WOPI_Host_UnitTests
             Assert.IsTrue(file1AsNullable == file1AsNullable);
             Assert.IsTrue(file1AsNullable == file2AsNullable);
             Assert.IsTrue(file2AsNullable == file1AsNullable);
+#pragma warning restore CS1718 // Comparison made to same variable
         }
 
         [TestMethod]

@@ -103,22 +103,22 @@ namespace FutureNHS_WOPI_Host_UnitTests.Handlers
 
             var contentHash = algo.ComputeHash(fileBuffer);
 
-            var fileMetadata = new FileMetadata("tile", "description", "version", "owner", "name", "extension", 1, "blobName", DateTimeOffset.UtcNow, Convert.ToBase64String(contentHash), FileStatus.Verified);
+            var fileMetadata = new FileMetadata("title", "description", fileVersion, "owner", fileName, "extension", 1, "blobName", DateTimeOffset.UtcNow, Convert.ToBase64String(contentHash), FileStatus.Verified);
 
             var fileWriteDetails = new FileWriteDetails(fileVersion, "content-type", contentHash, (ulong)fileBuffer.Length, "content-encoding", "content-language", DateTimeOffset.UtcNow, DateTimeOffset.UtcNow, fileMetadata);
 
             fileRepository.
-                Setup(x => x.WriteToStreamAsync(Moq.It.IsAny<File>(), Moq.It.IsAny<Stream>(), Moq.It.IsAny<CancellationToken>())).
-                Callback(async (File givenFile, Stream givenStream, CancellationToken givenCancellationToken) => {
+                Setup(x => x.WriteToStreamAsync(Moq.It.IsAny<FileMetadata>(), Moq.It.IsAny<Stream>(), Moq.It.IsAny<CancellationToken>())).
+                Callback(async (FileMetadata givenFileMetadata, Stream givenStream, CancellationToken givenCancellationToken) => {
 
-                    Assert.IsFalse(givenFile.IsEmpty);
+                    Assert.IsFalse(givenFileMetadata.IsEmpty);
                     Assert.IsNotNull(givenStream);
 
                     Assert.IsFalse(givenCancellationToken.IsCancellationRequested, "Expected the cancellation token to not be cancelled");
 
                     Assert.AreSame(responseBodyStream, givenStream, "Expected the SUT to as the repository to write the file to the stream it was asked to");
-                    Assert.AreSame(fileName, givenFile.Name, "Expected the SUT to request the file from the repository whose name it was provided with");
-                    Assert.AreSame(fileVersion, givenFile.Version, "Expected the SUT to request the file version from the repository that it was provided with");
+                    Assert.AreSame(fileName, givenFileMetadata.Name, "Expected the SUT to request the file from the repository whose name it was provided with");
+                    Assert.AreSame(fileVersion, givenFileMetadata.Version, "Expected the SUT to request the file version from the repository that it was provided with");
                     Assert.AreEqual(cancellationToken, givenCancellationToken, "Expected the same cancellation token to propagate between service interfaces");
 
                     await givenStream.WriteAsync(fileBuffer, cancellationToken);
@@ -138,7 +138,7 @@ namespace FutureNHS_WOPI_Host_UnitTests.Handlers
 
             await getFileWopiRequest.HandleAsync(httpContext, cancellationToken);
 
-            Assert.IsTrue(fileRepositoryInvoked, "Expected the SUT to defer tp the file repository to load the file");
+            Assert.IsTrue(fileRepositoryInvoked, "Expected the SUT to defer to the file repository with the correct parameters");
 
             Assert.AreEqual(fileBuffer.Length, responseBodyStream.Length, "All bytes in the file should be written to the target stream");
 

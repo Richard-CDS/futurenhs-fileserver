@@ -152,7 +152,7 @@ namespace FutureNHS_WOPI_Host_UnitTests.PlatformHelpers
 
             // First delay in array can be ignored because it's just the amount of time until the first invocation - ie not a retry
 
-            var firstDelay = xs[1];
+            var firstDelay = xs[1] - xs[0];
             var secondDelay = xs[2] - xs[1];
             var thirdDelay = xs[3] - xs[2];
             var fourthDelay = xs[4] - xs[3];

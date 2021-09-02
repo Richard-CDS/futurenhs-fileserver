@@ -4,6 +4,7 @@ using FutureNHS.WOPIHost.PlatformHelpers;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
+using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
@@ -36,7 +37,7 @@ namespace FutureNHS.WOPIHost
         {
             services.AddHttpClient("wopi-discovery-document").AddCoreResiliencyPolicies();
 
-            services.AddMemoryCache();
+            services.AddMemoryCache(); //options => { });
 
             var appInsightsInstrumentationKey = _configuration.GetValue<string>("APPINSIGHTS_INSTRUMENTATIONKEY");
 
@@ -69,10 +70,11 @@ namespace FutureNHS.WOPIHost
                     if (config.PrimaryServiceUrl is null) throw new ApplicationException("The azure blob storage primary service url is null in the files configuration section");
                     if (config.GeoRedundantServiceUrl is null) throw new ApplicationException("The azure blob storage geo-redundant service url is null in the files configuration section");
 
+                    var memoryCache = sp.GetRequiredService<IMemoryCache>();
                     var clock = sp.GetRequiredService<ISystemClock>();
                     var logger = sp.GetRequiredService<ILogger<AzureBlobStoreClient>>();
 
-                    return new AzureBlobStoreClient(config.PrimaryServiceUrl, config.GeoRedundantServiceUrl, clock, logger);
+                    return new AzureBlobStoreClient(config.PrimaryServiceUrl, config.GeoRedundantServiceUrl, memoryCache, clock, logger);
                 });
 
             services.AddScoped(
