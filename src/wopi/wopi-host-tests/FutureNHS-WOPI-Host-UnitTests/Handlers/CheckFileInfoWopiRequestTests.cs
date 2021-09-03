@@ -104,7 +104,7 @@ namespace FutureNHS_WOPI_Host_UnitTests.Handlers
             Assert.AreEqual(fileMetadata.Owner, ((JsonElement)(responseBody.OwnerId)).GetString());
             Assert.AreEqual(fileMetadata.Extension, ((JsonElement)(responseBody.FileExtension)).GetString());
             Assert.AreEqual(fileMetadata.SizeInBytes, ((JsonElement)(responseBody.Size)).GetUInt64());
-            Assert.AreEqual(fileMetadata.LastWriteTimeIso8601, ((JsonElement)(responseBody.LastModifiedTime)).GetString());
+            Assert.AreEqual(fileMetadata.LastWriteTime.ToIso8601(), ((JsonElement)(responseBody.LastModifiedTime)).GetString());
 
             Assert.AreEqual(FutureNHS.WOPIHost.File.FILENAME_MAXIMUM_LENGTH, ((JsonElement)(responseBody.FileNameMaxLength)).GetInt32());
         }
