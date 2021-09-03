@@ -17,14 +17,14 @@ namespace FutureNHS_WOPI_Host_UnitTests.Handlers
     public sealed class CheckFileInfoWopiRequestTests
     {
         [TestMethod]
-        [DataRow("file-title1", "file-description1", "version1", "owner1", "Excel-Spreadsheet.xlsx", ".xlsx", ulong.MaxValue, "hash")]
-        [DataRow("file-title2", "file-description2", "version2", "owner2", "Image-File.jpg", ".jpg", ulong.MaxValue, "hash")]
-        [DataRow("file-title3", "file-description3", "version3", "owner3", "OpenDocument-Text-File.odt", ".odt", ulong.MaxValue, "hash")]
-        [DataRow("file-title4", "file-description4", "version4", "owner4", "Portable-Document-Format-File.pdf", ".pdf", ulong.MaxValue, "hash")]
-        [DataRow("file-title5", "file-description5", "version5", "owner5", "PowerPoint-Presentation.pptx", ".pptx", ulong.MaxValue, "hash")]
-        [DataRow("file-title6", "file-description6", "version6", "owner6", "Text-File.txt", ".txt", ulong.MaxValue, "hash")]
-        [DataRow("file-title7", "file-description7", "version7", "owner7", "Word-Document.docx", ".docx", ulong.MaxValue, "hash")]
-        public async Task HandleAsync_FormsWOPICompliantResponseUsingFileMetadataAndUserContextAndFeatures(string title, string description, string version, string owner, string fileName, string extension, ulong sizeInBytes, string contentHash)
+        [DataRow("file-title1", "file-description1", "group1", "version1", "owner1", "Excel-Spreadsheet.xlsx", ".xlsx", ulong.MaxValue, "hash")]
+        [DataRow("file-title2", "file-description2", "group2", "version2", "owner2", "Image-File.jpg", ".jpg", ulong.MaxValue, "hash")]
+        [DataRow("file-title3", "file-description3", "group3", "version3", "owner3", "OpenDocument-Text-File.odt", ".odt", ulong.MaxValue, "hash")]
+        [DataRow("file-title4", "file-description4", "group4", "version4", "owner4", "Portable-Document-Format-File.pdf", ".pdf", ulong.MaxValue, "hash")]
+        [DataRow("file-title5", "file-description5", "group5", "version5", "owner5", "PowerPoint-Presentation.pptx", ".pptx", ulong.MaxValue, "hash")]
+        [DataRow("file-title6", "file-description6", "group6", "version6", "owner6", "Text-File.txt", ".txt", ulong.MaxValue, "hash")]
+        [DataRow("file-title7", "file-description7", "group7", "version7", "owner7", "Word-Document.docx", ".docx", ulong.MaxValue, "hash")]
+        public async Task HandleAsync_FormsWOPICompliantResponseUsingFileMetadataAndUserContextAndFeatures(string title, string description, string groupName, string version, string owner, string fileName, string extension, ulong sizeInBytes, string contentHash)
         {
             var cancellationToken = new CancellationToken();
 
@@ -49,6 +49,7 @@ namespace FutureNHS_WOPI_Host_UnitTests.Handlers
             var fileMetadata = new FileMetadata(
                 title: title, 
                 description: description,
+                groupName: groupName,
                 version: version, 
                 owner: owner, 
                 name: fileName, 

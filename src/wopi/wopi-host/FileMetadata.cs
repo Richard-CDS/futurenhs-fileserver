@@ -17,10 +17,11 @@ namespace FutureNHS.WOPIHost
 
         private FileMetadata() { }
 
-        public FileMetadata(string title, string description, string version, string owner, string name, string extension, ulong sizeInBytes, string blobName, DateTimeOffset lastWriteTime, string contentHash, FileStatus fileStatus)
+        public FileMetadata(string title, string description, string groupName, string version, string owner, string name, string extension, ulong sizeInBytes, string blobName, DateTimeOffset lastWriteTime, string contentHash, FileStatus fileStatus)
         {
             if (string.IsNullOrWhiteSpace(title)) throw new ArgumentNullException(nameof(title));
             if (string.IsNullOrWhiteSpace(description)) throw new ArgumentNullException(nameof(description));
+            if (string.IsNullOrWhiteSpace(groupName)) throw new ArgumentNullException(nameof(groupName));
             if (string.IsNullOrWhiteSpace(version)) throw new ArgumentNullException(nameof(version));
             if (string.IsNullOrWhiteSpace(owner)) throw new ArgumentNullException(nameof(owner));
             if (string.IsNullOrWhiteSpace(name)) throw new ArgumentNullException(nameof(name));
@@ -29,7 +30,10 @@ namespace FutureNHS.WOPIHost
             if (string.IsNullOrWhiteSpace(contentHash)) throw new ArgumentNullException(nameof(contentHash));
 
             if (3 > extension.Length) throw new ArgumentOutOfRangeException(nameof(extension), "The file extension needs to be at least 3 characters long");
+            if (!extension.StartsWith('.')) throw new ArgumentOutOfRangeException(nameof(extension), "The file extension needs to start with a period character");
             if (0 >= sizeInBytes) throw new ArgumentOutOfRangeException(nameof(sizeInBytes), "The file size needs to be greater than 0 bytes");
+
+            // TODO - Might make sense to check the last write time isn't some crazy past of future date (clock skew)?
 
             Title = title;
             Description = description;
@@ -39,15 +43,18 @@ namespace FutureNHS.WOPIHost
             Extension = extension;
             BlobName = blobName;
             SizeInBytes = sizeInBytes;
-            LastWriteTimeIso8601 = lastWriteTime.ToString("o", CultureInfo.InvariantCulture); // TODO - Check this isn't a crazy future date?
+            LastWriteTime = lastWriteTime;
             ContentHash = contentHash;
             FileStatus = fileStatus;
+            GroupName = groupName;
         }
 
         public bool IsEmpty => ReferenceEquals(this, EMPTY);
 
         public string? Title { get; }
         public string? Description { get; }
+
+        public string? GroupName { get; }
 
         public string? Name { get; }
         public string? Version { get; }
@@ -60,6 +67,6 @@ namespace FutureNHS.WOPIHost
 
         public ulong? SizeInBytes { get; }
         public FileStatus? FileStatus { get; }
-        public string? LastWriteTimeIso8601 { get; } 
+        public DateTimeOffset? LastWriteTime { get; } 
     }
 }

@@ -103,7 +103,7 @@ namespace FutureNHS_WOPI_Host_UnitTests.Handlers
 
             var contentHash = algo.ComputeHash(fileBuffer);
 
-            var fileMetadata = new FileMetadata("title", "description", fileVersion, "owner", fileName, "extension", 1, "blobName", DateTimeOffset.UtcNow, Convert.ToBase64String(contentHash), FileStatus.Verified);
+            var fileMetadata = new FileMetadata("title", "description", "group-name", fileVersion, "owner", fileName, "extension", 1, "blobName", DateTimeOffset.UtcNow, Convert.ToBase64String(contentHash), FileStatus.Verified);
 
             var fileWriteDetails = new FileWriteDetails(fileVersion, "content-type", contentHash, (ulong)fileBuffer.Length, "content-encoding", "content-language", DateTimeOffset.UtcNow, DateTimeOffset.UtcNow, fileMetadata);
 

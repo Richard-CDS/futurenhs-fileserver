@@ -81,24 +81,25 @@ namespace FutureNHS.WOPIHost
 
             cancellationToken.ThrowIfCancellationRequested();
 
-            // TODO - Implement properly and defer to a SQL client to do the heavy lifting
-
             var sb = new StringBuilder();
 
-            sb.AppendLine($"SELECT   [Title]           = a.[Title]");
-            sb.AppendLine($"       , [Description]     = a.[Description]");
-            sb.AppendLine($"       , [Name]            = a.[FileName]");
-            sb.AppendLine($"       , [Version]         = @FileVersion");            // TODO - Wire up when in database
-            sb.AppendLine($"       , [SizeInBytes]     = a.[FileSize]");            // TODO - to be renamed in database
-            sb.AppendLine($"       , [Extension]       = a.[FileExtension]");
-            sb.AppendLine($"       , [BlobName]        = a.[FileUrl]");             // TODO - to be renamed in database
-            sb.AppendLine($"       , [ContentHash]     = @FileContentHash");        // TODO - Wire up when in database
-            sb.AppendLine($"       , [LastWriteTime]   = CONVERT(DATETIMEOFFSET, ISNULL(a.[ModifiedDate], a.[CreatedDate]))"); // TODO - DB data type needs changing to datetimeoffset, or datetime2 with renamed to suffix UTC so we know what it contains
-            sb.AppendLine($"       , [FileStatus]      = a.[UploadStatus]");        // TODO - Earmarked to be renamed in DB to FileStatus
-            sb.AppendLine($"       , [Owner]           = b.[UserName]");
-            sb.AppendLine($"FROM   dbo.[File] a");
+            sb.AppendLine($"SELECT   [{nameof(FileMetadata.Title)}]            = a.[Title]");
+            sb.AppendLine($"       , [{nameof(FileMetadata.Description)}]      = a.[Description]");
+            sb.AppendLine($"       , [{nameof(FileMetadata.GroupName)}]        = d.[Name]");
+            sb.AppendLine($"       , [{nameof(FileMetadata.Name)}]             = a.[FileName]");
+            sb.AppendLine($"       , [{nameof(FileMetadata.Version)}]          = @FileVersion");            // TODO - Wire up when in database
+            sb.AppendLine($"       , [{nameof(FileMetadata.SizeInBytes)}]      = a.[FileSize]");            // TODO - to be renamed in database
+            sb.AppendLine($"       , [{nameof(FileMetadata.Extension)}]        = a.[FileExtension]");
+            sb.AppendLine($"       , [{nameof(FileMetadata.BlobName)}]         = a.[FileUrl]");             // TODO - to be renamed in database
+            sb.AppendLine($"       , [{nameof(FileMetadata.ContentHash)}]      = @FileContentHash");        // TODO - Wire up when in database
+            sb.AppendLine($"       , [{nameof(FileMetadata.LastWriteTime)}]    = CONVERT(DATETIMEOFFSET, ISNULL(a.[ModifiedDate], a.[CreatedDate]))"); // TODO - DB data type needs changing to datetimeoffset, or datetime2 with renamed to suffix UTC so we know what it contains
+            sb.AppendLine($"       , [{nameof(FileMetadata.FileStatus)}]       = a.[UploadStatus]");        // TODO - Earmarked to be renamed in DB to FileStatus
+            sb.AppendLine($"       , [{nameof(FileMetadata.Owner)}]            = b.[UserName]");
+            sb.AppendLine($"FROM   dbo.[File]           a");
             sb.AppendLine($"JOIN   dbo.[MembershipUser] b ON b.[Id] = a.[CreatedBy]");
-            sb.AppendLine($"WHERE  a.[Id] = @Id");
+            sb.AppendLine($"JOIN   dbo.[Folder]         c ON c.[Id] = a.[ParentFolder]");
+            sb.AppendLine($"JOIN   dbo.[Group]          d ON d.[Id] = c.[ParentGroup]");
+            sb.AppendLine($"WHERE  a.[Id]               = @Id");
 
             var parameters = new { Id = file.Name, FileVersion = file.Version, FileContentHash = "replace-with-hash-code-soon" };
 
