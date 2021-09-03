@@ -78,7 +78,7 @@ namespace FutureNHS_WOPI_Host_UnitTests
 
             using var destinationStream = new System.IO.MemoryStream();
 
-            var fileMetadata = new FileMetadata("title", "description", "group-name", file.Version, "owner", file.Name, "extension", 396764, blobName, clock.UtcNow, fileHash, FileStatus.Verified);
+            var fileMetadata = new FileMetadata("title", "description", "group-name", file.Version, "owner", file.Name, ".extension", 396764, blobName, clock.UtcNow, fileHash, FileStatus.Verified);
 
             var fileWriteDetails = await fileRepository.WriteToStreamAsync(fileMetadata, destinationStream, cancellationToken);
 

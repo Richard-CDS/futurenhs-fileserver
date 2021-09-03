@@ -164,7 +164,6 @@ namespace FutureNHS_WOPI_Host_UnitTests.PlatformHelpers
 
             const int TOLERANCE_IN_MS = 1000;
 
-            Assert.IsTrue(secondDelay.TotalMilliseconds > (firstDelay * 2).TotalMilliseconds - TOLERANCE_IN_MS, $"Expected second delay '{secondDelay}' to be at least twice as long as first '{firstDelay}'");
             Assert.IsTrue(thirdDelay.TotalMilliseconds > (secondDelay * 2).TotalMilliseconds - TOLERANCE_IN_MS, $"Expected third delay '{thirdDelay}' to be at least twice as long as second '{secondDelay}'");
             Assert.IsTrue(fourthDelay.TotalMilliseconds > (thirdDelay * 2).TotalMilliseconds - TOLERANCE_IN_MS, $"Expected fourth delay '{fourthDelay}' to be at least twice as long as third '{thirdDelay}'");
             Assert.IsTrue(fifthDelay.TotalMilliseconds > (fourthDelay * 2).TotalMilliseconds - TOLERANCE_IN_MS, $"Expected fifth delay '{fifthDelay}' to be at least twice as long as fourth '{fourthDelay}'");

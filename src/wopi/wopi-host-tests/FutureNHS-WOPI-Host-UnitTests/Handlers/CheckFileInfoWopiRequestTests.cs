@@ -77,6 +77,10 @@ namespace FutureNHS_WOPI_Host_UnitTests.Handlers
                 }).
                 Returns(Task.FromResult(fileMetadata));
 
+            var ephemeralDownloadLink = new Uri("https://www.file-storage.com/files/file_id", UriKind.Absolute);
+
+            fileRepository.Setup(x => x.GeneratePrivateEphemeralDownloadLink(fileMetadata, Moq.It.IsAny<CancellationToken>())).Returns(Task.FromResult(ephemeralDownloadLink));
+
             var features = new Features();
 
             var accessToken = Guid.NewGuid().ToString();
@@ -104,6 +108,7 @@ namespace FutureNHS_WOPI_Host_UnitTests.Handlers
             Assert.AreEqual(fileMetadata.Owner, ((JsonElement)(responseBody.OwnerId)).GetString());
             Assert.AreEqual(fileMetadata.Extension, ((JsonElement)(responseBody.FileExtension)).GetString());
             Assert.AreEqual(fileMetadata.SizeInBytes, ((JsonElement)(responseBody.Size)).GetUInt64());
+            Assert.AreEqual(ephemeralDownloadLink.AbsoluteUri, ((JsonElement)(responseBody.FileUrl)).GetString());
             Assert.AreEqual(fileMetadata.LastWriteTime.ToIso8601(), ((JsonElement)(responseBody.LastModifiedTime)).GetString());
 
             Assert.AreEqual(FutureNHS.WOPIHost.File.FILENAME_MAXIMUM_LENGTH, ((JsonElement)(responseBody.FileNameMaxLength)).GetInt32());
