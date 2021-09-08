@@ -85,9 +85,9 @@ namespace FutureNHS.WOPIHost
                     if (string.IsNullOrWhiteSpace(config.ReadWriteConnectionString)) throw new ApplicationException("The azure read write connection string is missing from the files configuration section");
                     if (string.IsNullOrWhiteSpace(config.ReadOnlyConnectionString)) throw new ApplicationException("The azure read only connection string is missing from the files configuration section");
  
-                    var logger = sp.GetRequiredService<ILogger<AzureSqlClient>>();
+                    var logger = sp.GetRequiredService<ILogger<AzureSqlDbConnectionFactory>>();
 
-                    return new AzureSqlClient(config.ReadWriteConnectionString, config.ReadOnlyConnectionString, logger);
+                    return new AzureSqlDbConnectionFactory(config.ReadWriteConnectionString, config.ReadOnlyConnectionString, logger);
                     });
 
             services.AddScoped<IAzureBlobStoreClient>(sp => sp.GetRequiredService<AzureBlobStoreClient>());

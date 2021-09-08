@@ -23,7 +23,11 @@ namespace FutureNHS_WOPI_Host_UnitTests.PlatformHelpers
 
             var logger = new Moq.Mock<ILogger<AzureSqlClient>>().Object;
 
-            var azureSqlClient = new AzureSqlClient("read-write", "read-only", logger);
+            var sqlCnFactoryLogger = new Moq.Mock<ILogger<AzureSqlDbConnectionFactory>>().Object;
+
+            var sqlDbConnectionFactory = new AzureSqlDbConnectionFactory("read-write", "read-only", sqlCnFactoryLogger);
+
+            var azureSqlClient = new AzureSqlClient(sqlDbConnectionFactory, logger);
 
             var retryPolicy = azureSqlClient.GetAsyncRetryPolicy();
 
@@ -51,7 +55,11 @@ namespace FutureNHS_WOPI_Host_UnitTests.PlatformHelpers
 
             var logger = new Moq.Mock<ILogger<AzureSqlClient>>().Object;
 
-            var azureSqlClient = new AzureSqlClient("read-write", "read-only", logger);
+            var sqlCnFactoryLogger = new Moq.Mock<ILogger<AzureSqlDbConnectionFactory>>().Object;
+
+            var sqlDbConnectionFactory = new AzureSqlDbConnectionFactory("read-write", "read-only", sqlCnFactoryLogger);
+
+            var azureSqlClient = new AzureSqlClient(sqlDbConnectionFactory, logger);
 
             var retryPolicy = azureSqlClient.GetAsyncRetryPolicy();
 
@@ -76,7 +84,11 @@ namespace FutureNHS_WOPI_Host_UnitTests.PlatformHelpers
 
             var logger = new Moq.Mock<ILogger<AzureSqlClient>>().Object;
 
-            var azureSqlClient = new AzureSqlClient("read-write", "read-only", logger);
+            var sqlCnFactoryLogger = new Moq.Mock<ILogger<AzureSqlDbConnectionFactory>>().Object;
+
+            var sqlDbConnectionFactory = new AzureSqlDbConnectionFactory("read-write", "read-only", sqlCnFactoryLogger);
+
+            var azureSqlClient = new AzureSqlClient(sqlDbConnectionFactory, logger);
 
             var retryPolicy = azureSqlClient.GetAsyncRetryPolicy();
 
@@ -104,7 +116,11 @@ namespace FutureNHS_WOPI_Host_UnitTests.PlatformHelpers
 
             var logger = new Moq.Mock<ILogger<AzureSqlClient>>().Object;
 
-            var azureSqlClient = new AzureSqlClient("read-write", "read-only", logger);
+            var sqlCnFactoryLogger = new Moq.Mock<ILogger<AzureSqlDbConnectionFactory>>().Object;
+
+            var sqlDbConnectionFactory = new AzureSqlDbConnectionFactory("read-write", "read-only", sqlCnFactoryLogger);
+
+            var azureSqlClient = new AzureSqlClient(sqlDbConnectionFactory, logger);
 
             var retryPolicy = azureSqlClient.GetAsyncRetryPolicy();
 
@@ -132,7 +148,11 @@ namespace FutureNHS_WOPI_Host_UnitTests.PlatformHelpers
 
             var logger = new Moq.Mock<ILogger<AzureSqlClient>>().Object;
 
-            var azureSqlClient = new AzureSqlClient("read-write", "read-only", logger);
+            var sqlCnFactoryLogger = new Moq.Mock<ILogger<AzureSqlDbConnectionFactory>>().Object;
+
+            var sqlDbConnectionFactory = new AzureSqlDbConnectionFactory("read-write", "read-only", sqlCnFactoryLogger);
+
+            var azureSqlClient = new AzureSqlClient(sqlDbConnectionFactory, logger);
 
             var retryPolicy = azureSqlClient.GetAsyncRetryPolicy();
 

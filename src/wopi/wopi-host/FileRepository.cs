@@ -92,7 +92,7 @@ namespace FutureNHS.WOPIHost
             sb.AppendLine($"       , [{nameof(FileMetadata.Extension)}]        = a.[FileExtension]");
             sb.AppendLine($"       , [{nameof(FileMetadata.BlobName)}]         = a.[FileUrl]");             // TODO - to be renamed in database
             sb.AppendLine($"       , [{nameof(FileMetadata.ContentHash)}]      = @FileContentHash");        // TODO - Wire up when in database
-            sb.AppendLine($"       , [{nameof(FileMetadata.LastWriteTime)}]    = CONVERT(DATETIMEOFFSET, ISNULL(a.[ModifiedDate], a.[CreatedDate]))"); // TODO - DB data type needs changing to datetimeoffset, or datetime2 with renamed to suffix UTC so we know what it contains
+            sb.AppendLine($"       , [{nameof(FileMetadata.LastWriteTime)}]    = CONVERT(DATETIMEOFFSET, ISNULL(a.[ModifiedAtUtc], a.[CreatedAtUtc]))"); // TODO - DB data type needs changing to datetimeoffset, or datetime2 with renamed to suffix UTC so we know what it contains
             sb.AppendLine($"       , [{nameof(FileMetadata.FileStatus)}]       = a.[UploadStatus]");        // TODO - Earmarked to be renamed in DB to FileStatus
             sb.AppendLine($"       , [{nameof(FileMetadata.Owner)}]            = b.[UserName]");
             sb.AppendLine($"FROM   dbo.[File]           a");

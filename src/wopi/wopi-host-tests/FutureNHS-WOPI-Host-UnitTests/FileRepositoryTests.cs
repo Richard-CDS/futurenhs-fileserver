@@ -66,7 +66,11 @@ namespace FutureNHS_WOPI_Host_UnitTests
 
             var sqlLogger = new Moq.Mock<ILogger<AzureSqlClient>>().Object;
 
-            var azureSqlClient = new AzureSqlClient(readWriteConnectionString, readOnlyConnectionString, sqlLogger);
+            var sqlCnFactoryLogger = new Moq.Mock<ILogger<AzureSqlDbConnectionFactory>>().Object;
+
+            var sqlDbConnectionFactory = new AzureSqlDbConnectionFactory(readWriteConnectionString, readOnlyConnectionString, sqlCnFactoryLogger);
+
+            var azureSqlClient = new AzureSqlClient(sqlDbConnectionFactory, sqlLogger);
 
             IFileRepository fileRepository = new FileRepository(azureBlobStorageClient, azureSqlClient, azurePlatformConfigurationOptionsSnapshot.Object, logger);
 
@@ -136,7 +140,11 @@ namespace FutureNHS_WOPI_Host_UnitTests
 
             var sqlLogger = new Moq.Mock<ILogger<AzureSqlClient>>().Object;
 
-            var azureSqlClient = new AzureSqlClient(readWriteConnectionString, readOnlyConnectionString, sqlLogger);
+            var sqlCnFactoryLogger = new Moq.Mock<ILogger<AzureSqlDbConnectionFactory>>().Object;
+
+            var sqlDbConnectionFactory = new AzureSqlDbConnectionFactory(readWriteConnectionString, readOnlyConnectionString, sqlCnFactoryLogger);
+
+            var azureSqlClient = new AzureSqlClient(sqlDbConnectionFactory, sqlLogger);
 
             IFileRepository fileRepository = new FileRepository(azureBlobStorageClient, azureSqlClient, azurePlatformConfigurationOptionsSnapshot.Object, logger);
 
@@ -195,7 +203,11 @@ namespace FutureNHS_WOPI_Host_UnitTests
 
             var sqlLogger = new Moq.Mock<ILogger<AzureSqlClient>>().Object;
 
-            var azureSqlClient = new AzureSqlClient(readWriteConnectionString, readOnlyConnectionString, sqlLogger);
+            var sqlCnFactoryLogger = new Moq.Mock<ILogger<AzureSqlDbConnectionFactory>>().Object;
+
+            var sqlDbConnectionFactory = new AzureSqlDbConnectionFactory(readWriteConnectionString, readOnlyConnectionString, sqlCnFactoryLogger);
+
+            var azureSqlClient = new AzureSqlClient(sqlDbConnectionFactory, sqlLogger);
 
             IFileRepository fileRepository = new FileRepository(azureBlobStorageClient, azureSqlClient, azurePlatformConfigurationOptionsSnapshot.Object, logger);
 

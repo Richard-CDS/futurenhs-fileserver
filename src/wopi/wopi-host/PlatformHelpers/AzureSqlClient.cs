@@ -23,19 +23,14 @@ namespace FutureNHS.WOPIHost.PlatformHelpers
     {
         private readonly static ConcurrentDictionary<string, AsyncPolicyWrap> _globalPolicies = new ConcurrentDictionary<string, AsyncPolicyWrap>();
 
-        private readonly string _readWriteConnectionString;
-        private readonly string _readOnlyConnectionString;
+        private readonly IAzureSqlDbConnectionFactory _azureSqlDbConnectionFactory;
         private readonly ILogger<AzureSqlClient>? _logger;
 
-        public AzureSqlClient(string readWriteConnectionString, string readOnlyConnectionString, ILogger<AzureSqlClient>? logger)
+        public AzureSqlClient(IAzureSqlDbConnectionFactory azureSqlDbConnectionFactory, ILogger<AzureSqlClient>? logger)
         {
-            if (string.IsNullOrWhiteSpace(readWriteConnectionString)) throw new ArgumentNullException(nameof(readWriteConnectionString));
-            if (string.IsNullOrWhiteSpace(readOnlyConnectionString)) throw new ArgumentNullException(nameof(readOnlyConnectionString));
-
             _logger = logger;
 
-            _readWriteConnectionString = readWriteConnectionString;
-            _readOnlyConnectionString = readOnlyConnectionString;
+            _azureSqlDbConnectionFactory = azureSqlDbConnectionFactory ?? throw new ArgumentNullException(nameof(azureSqlDbConnectionFactory));
         }
 
         async Task<T> IAzureSqlClient.GetRecord<T>(string sqlQuery, object parameters, CancellationToken cancellationToken)
@@ -45,13 +40,13 @@ namespace FutureNHS.WOPIHost.PlatformHelpers
 
             cancellationToken.ThrowIfCancellationRequested();
 
-            using var sqlConnection = new SqlConnection(_readOnlyConnectionString);
+            using var sqlConnection = await _azureSqlDbConnectionFactory.GetReadOnlyConnectionAsync(cancellationToken);
 
             var cmd = new CommandDefinition(sqlQuery, parameters, cancellationToken: cancellationToken);
 
             var retryPolicy = GetAsyncRetryPolicy();
 
-            var globalResiliencyPolicy = GetAsyncGlobalResiliencyPolicyFor(_readOnlyConnectionString);
+            var globalResiliencyPolicy = GetAsyncGlobalResiliencyPolicyFor(sqlConnection.ConnectionString);
 
             var resiliencyPolicy = Policy.WrapAsync(retryPolicy, globalResiliencyPolicy);
 
