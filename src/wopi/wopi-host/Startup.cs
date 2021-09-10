@@ -1,6 +1,7 @@
 using FutureNHS.WOPIHost.Configuration;
 using FutureNHS.WOPIHost.HttpHelpers;
 using FutureNHS.WOPIHost.PlatformHelpers;
+using Microsoft.ApplicationInsights.DependencyCollector;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
@@ -44,6 +45,11 @@ namespace FutureNHS.WOPIHost
             if (!string.IsNullOrWhiteSpace(appInsightsInstrumentationKey))
             {
                 services.AddApplicationInsightsTelemetry(appInsightsInstrumentationKey);
+
+                services.ConfigureTelemetryModule<DependencyTrackingTelemetryModule>(
+                    (module, o) => { 
+                        module.EnableSqlCommandTextInstrumentation = true; 
+                    });
             }
             else services.AddLogging();
 
@@ -62,7 +68,7 @@ namespace FutureNHS.WOPIHost
 
             services.AddScoped<CoreResilientRetryHandler>();
 
-            services.AddScoped(
+            services.AddScoped<IAzureBlobStoreClient>(
                 sp => {
                     var config = sp.GetRequiredService<IOptionsSnapshot<AzurePlatformConfiguration>>().Value.AzureBlobStorage;
 
@@ -77,7 +83,7 @@ namespace FutureNHS.WOPIHost
                     return new AzureBlobStoreClient(config.PrimaryServiceUrl, config.GeoRedundantServiceUrl, memoryCache, clock, logger);
                 });
 
-            services.AddScoped(
+            services.AddScoped<IAzureSqlDbConnectionFactory>(
                 sp => {
                     var config = sp.GetRequiredService<IOptionsSnapshot<AzurePlatformConfiguration>>().Value.AzureSql;
 
@@ -90,7 +96,7 @@ namespace FutureNHS.WOPIHost
                     return new AzureSqlDbConnectionFactory(config.ReadWriteConnectionString, config.ReadOnlyConnectionString, logger);
                     });
 
-            services.AddScoped<IAzureBlobStoreClient>(sp => sp.GetRequiredService<AzureBlobStoreClient>());
+            services.AddScoped<AzureSqlClient>();
             services.AddScoped<IAzureSqlClient>(sp => sp.GetRequiredService<AzureSqlClient>());
 
             services.AddScoped<FileRepository>();
