@@ -14,7 +14,7 @@ using System.Threading;
 using System.Threading.Tasks;
 
 namespace FutureNHS.WOPIHost.PlatformHelpers
-{
+{  
     public interface IAzureBlobStoreClient
     {
         Task<BlobDownloadDetails> FetchBlobAndWriteToStream(string containerName, string blobName, string blobVersion, string contentHash, Stream streamToWriteTo, CancellationToken cancellationToken);
@@ -138,7 +138,7 @@ namespace FutureNHS.WOPIHost.PlatformHelpers
             catch (AuthenticationFailedException ex)
             {
                 _logger?.LogError(ex, "Unable to authenticate with the Azure Blob Storage service using the default credentials");
-
+                
                 throw;
             }
             catch (Azure.RequestFailedException ex)
